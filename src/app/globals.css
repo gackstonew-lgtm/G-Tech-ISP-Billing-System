@@ -33,33 +33,33 @@
     --radius: 0.75rem;
   }
 
-  /* WebHunt Authoritative Design Tokens - Dark Theme */
+  /* WebHunt Authoritative Design Tokens - Dark Theme (AMOLED Black) */
   .dark {
-    --background: #090d16;
-    --foreground: #f1f5f9;
-    --card: #0f172a;
-    --card-foreground: #f1f5f9;
-    --card-inner: #1e293b;
-    --popover: #0f172a;
-    --popover-foreground: #f1f5f9;
-    --surface: #0f172a;
-    --surface-elevated: #1e293b;
-    --surface-subtle: #090d16;
-    --surface-secondary: #172033;
-    --primary: #3b82f6;
+    --background: #000000;
+    --foreground: #f4f4f5;
+    --card: #09090b;
+    --card-foreground: #f4f4f5;
+    --card-inner: #121215;
+    --popover: #09090b;
+    --popover-foreground: #f4f4f5;
+    --surface: #09090b;
+    --surface-elevated: #141418;
+    --surface-subtle: #000000;
+    --surface-secondary: #18181c;
+    --primary: #2d7dff;
     --primary-foreground: #ffffff;
-    --primary-hover: #2563eb;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --accent: #f43f5e;
+    --primary-hover: #4d96ff;
+    --muted: #141418;
+    --muted-foreground: #8e8e99;
+    --accent: #ff3b4e;
     --accent-foreground: #ffffff;
-    --destructive: #f43f5e;
+    --destructive: #ff3b4e;
     --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.08);
     --border-subtle: rgba(255, 255, 255, 0.04);
-    --border-strong: rgba(255, 255, 255, 0.12);
-    --input: #0f172a;
-    --ring: rgba(59, 130, 246, 0.3);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --input: #09090b;
+    --ring: rgba(45, 125, 255, 0.4);
     --success: #10b981;
     --success-foreground: #ffffff;
   }
