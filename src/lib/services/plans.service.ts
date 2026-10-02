@@ -1,54 +1,68 @@
 // ====================================================================
 // G-TECH ISP OPERATING SYSTEM
 // Plans Service — Data Access Layer
+// Supports Real Multi-Tenant Database & Isolated Demo Plans
 // ====================================================================
 
-import type { ServicePlan, ServiceType } from '@/types'
-import { SEED_PLANS } from '@/lib/db/mock-db'
-import { handleSupabaseError } from '@/lib/supabase/errors'
-import type { ServiceResult } from './customers.service'
+import type { ServicePlan, ServiceType } from "@/types";
+import { SEED_PLANS } from "@/lib/db/mock-db";
+import { handleSupabaseError } from "@/lib/supabase/errors";
+import type { ServiceResult } from "./customers.service";
 
 const SUPABASE_READY = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://[PROJECT_REF].supabase.co'
-)
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://[PROJECT_REF].supabase.co"
+);
 
 export class PlansService {
-  static async list(serviceType?: ServiceType): Promise<ServiceResult<ServicePlan[]>> {
-    if (!SUPABASE_READY) {
-      let data = [...SEED_PLANS]
+  private static async checkIsDemo(explicitDemo?: boolean): Promise<boolean> {
+    if (explicitDemo !== undefined) return explicitDemo;
+    try {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      return cookieStore.get("gtech_demo_mode")?.value === "true";
+    } catch {
+      return false;
+    }
+  }
+
+  static async list(serviceType?: ServiceType, isDemoParam?: boolean): Promise<ServiceResult<ServicePlan[]>> {
+    const isDemo = await this.checkIsDemo(isDemoParam);
+
+    if (isDemo || !SUPABASE_READY) {
+      let data = [...SEED_PLANS];
       if (serviceType) {
-        data = data.filter(p => p.serviceType === serviceType)
+        data = data.filter((p) => p.serviceType === serviceType);
       }
-      return { data, error: null, count: data.length }
+      return { data, error: null, count: data.length };
     }
 
     try {
-      const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-      const supabase = await createSupabaseServerClient()
+      const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+      const supabase = await createSupabaseServerClient();
 
       let query = supabase
-        .from('plans')
-        .select('*', { count: 'exact' })
-        .eq('is_active', true)
-        .order('price', { ascending: true })
+        .from("plans")
+        .select("*", { count: "exact" })
+        .eq("is_active", true)
+        .order("price", { ascending: true });
 
       if (serviceType) {
-        query = query.eq('service_type', serviceType)
+        query = query.eq("service_type", serviceType);
       }
 
-      const { data, error, count } = await query
+      const { data, error, count } = await query;
 
       if (error) {
-        const appError = handleSupabaseError(error, 'plans.list')
-        return { data: null, error: appError.userMessage }
+        const appError = handleSupabaseError(error, "plans.list");
+        return { data: null, error: appError.userMessage };
       }
 
-      const plans: ServicePlan[] = (data ?? []).map(mapPlanRow)
-      return { data: plans, error: null, count: count ?? plans.length }
+      const plans: ServicePlan[] = (data ?? []).map(mapPlanRow);
+      return { data: plans, error: null, count: count ?? plans.length };
     } catch (err) {
-      const appError = handleSupabaseError(err, 'plans.list')
-      return { data: null, error: appError.userMessage }
+      const appError = handleSupabaseError(err, "plans.list");
+      return { data: null, error: appError.userMessage };
     }
   }
 }
@@ -74,5 +88,5 @@ function mapPlanRow(row: Record<string, unknown>): ServicePlan {
     mikrotikRateLimit: row.mikrotik_rate_limit as string,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at as string,
-  }
+  };
 }

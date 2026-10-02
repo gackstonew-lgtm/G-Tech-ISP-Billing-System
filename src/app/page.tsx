@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState } from "react";
 import Link from "next/link";
 import {
@@ -22,14 +23,17 @@ import {
   Sun,
   Moon,
   LogIn,
+  UserPlus,
 } from "lucide-react";
 import { WindowFrame } from "@/components/ui/WindowFrame";
 import { GlassBadge } from "@/components/ui/GlassBadge";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"PPPOE" | "HOTSPOT">("PPPOE");
   const { theme, toggleTheme } = useTheme();
+  const { enterDemoMode, user } = useAuth();
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary transition-colors duration-200">
@@ -60,25 +64,29 @@ export default function HomePage() {
             {/* Pill Navigation */}
             <nav className="hidden md:flex items-center space-x-1 bg-surface px-3 py-1.5 rounded-full border border-border shadow-xs">
               <Link
-                href="/dashboard"
+                href="/dashboard?demo=true"
+                onClick={enterDemoMode}
                 className="px-4 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
-                NOC Dashboard
+                NOC Dashboard (Demo)
               </Link>
               <Link
-                href="/customers"
+                href="/customers?demo=true"
+                onClick={enterDemoMode}
                 className="px-4 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Subscribers
               </Link>
               <Link
-                href="/routers"
+                href="/routers?demo=true"
+                onClick={enterDemoMode}
                 className="px-4 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 MikroTik Fleet
               </Link>
               <Link
-                href="/vouchers"
+                href="/vouchers?demo=true"
+                onClick={enterDemoMode}
                 className="px-4 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Vouchers
@@ -95,21 +103,41 @@ export default function HomePage() {
                 {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-primary" />}
               </button>
 
-              <Link
-                href="/portal"
-                className="hidden sm:inline-flex items-center px-3.5 py-2 text-xs font-semibold text-foreground hover:text-primary transition-colors"
+              <button
+                onClick={enterDemoMode}
+                className="hidden sm:inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 transition-colors"
               >
-                <LogIn className="w-3.5 h-3.5 mr-1.5" />
-                <span>Subscriber Care</span>
-              </Link>
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                <span>Demo Mode</span>
+              </button>
 
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all duration-200 shadow-brand-btn"
-              >
-                <span>Launch NOC</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              {user ? (
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all duration-200 shadow-brand-btn"
+                >
+                  <span>Dashboard</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href="/sign-in"
+                    className="inline-flex items-center space-x-1 px-3 py-2 text-xs font-semibold text-foreground hover:text-primary transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5 mr-1" />
+                    <span>Sign In</span>
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all duration-200 shadow-brand-btn"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Register</span>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -140,18 +168,19 @@ export default function HomePage() {
               {/* Dual Action Buttons */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-2">
                 <Link
-                  href="/dashboard"
+                  href="/register"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground h-12 px-7 text-sm font-bold transition-all duration-200 group shadow-brand-btn"
                 >
-                  <span>Get Started</span>
+                  <span>Create Free ISP Account</span>
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
-                <Link
-                  href="/captive"
+                <button
+                  onClick={enterDemoMode}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-surface hover:bg-surface-elevated text-foreground border border-border h-12 px-7 text-sm font-semibold transition-all duration-200 shadow-xs"
                 >
-                  <span>Test Captive WiFi</span>
-                </Link>
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Explore Demo Mode</span>
+                </button>
               </div>
             </div>
 
@@ -218,12 +247,12 @@ export default function HomePage() {
                         <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
                           M-Pesa: RKF9283KDJ
                         </span>
-                        <Link
-                          href="/customers"
+                        <button
+                          onClick={enterDemoMode}
                           className="px-3.5 py-1.5 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-xs font-semibold text-foreground transition-colors"
                         >
-                          Inspect
-                        </Link>
+                          Inspect (Demo)
+                        </button>
                       </div>
                     </div>
 
@@ -255,12 +284,12 @@ export default function HomePage() {
                         <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
                           M-Pesa: RKF8841LPS
                         </span>
-                        <Link
-                          href="/customers"
+                        <button
+                          onClick={enterDemoMode}
                           className="px-3.5 py-1.5 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-xs font-semibold text-foreground transition-colors"
                         >
-                          Inspect
-                        </Link>
+                          Inspect (Demo)
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -297,13 +326,13 @@ export default function HomePage() {
                     </li>
                   </ul>
                 </div>
-                <Link
-                  href="/dashboard"
+                <button
+                  onClick={enterDemoMode}
                   className="mt-6 w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs transition flex items-center justify-center gap-2 shadow-brand-btn"
                 >
-                  <span>Launch Dashboard</span>
+                  <span>Launch Demo Dashboard</span>
                   <ArrowRight className="w-4 h-4" />
-                </Link>
+                </button>
               </div>
 
               {/* Card 2 */}

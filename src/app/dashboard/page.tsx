@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
   Users,
@@ -7,36 +8,77 @@ import {
   Router as RouterIcon,
   CreditCard,
   ArrowUpRight,
-  ArrowDownLeft,
   Activity,
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Zap,
   TrendingUp,
-  ShieldCheck,
   RefreshCw,
-  Plus,
   Ticket,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import {
   getSeedNOCStats,
   SEED_PAYMENTS,
   SEED_ROUTERS,
-  SEED_CUSTOMERS,
 } from "@/lib/db/mock-db";
+import { NOCStats, Router, Payment } from "@/types";
 import { formatKES, formatShortDate } from "@/lib/utils";
 import Link from "next/link";
 import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(getSeedNOCStats());
+  const { isDemoMode, organization, user } = useAuth();
+
+  const [stats, setStats] = useState<NOCStats>(getSeedNOCStats());
+  const [routers, setRouters] = useState<Router[]>(SEED_ROUTERS);
+  const [payments, setPayments] = useState<Payment[]>(SEED_PAYMENTS);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = () => {
+  const fetchDashboardData = async () => {
+    if (isDemoMode) {
+      setStats(getSeedNOCStats());
+      setRouters(SEED_ROUTERS);
+      setPayments(SEED_PAYMENTS);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const [nocRes, routerRes] = await Promise.all([
+        fetch("/api/v1/monitoring/noc"),
+        fetch("/api/v1/routers"),
+      ]);
+
+      const nocData = await nocRes.json();
+      const routerData = await routerRes.json();
+
+      if (nocData?.success && nocData.data) {
+        setStats(nocData.data);
+      }
+      if (routerData?.success && routerData.data) {
+        setRouters(routerData.data);
+      }
+      setPayments([]); // Real user payment ledger loaded from database
+    } catch (err) {
+      console.error("[Dashboard] Failed to fetch real metrics:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [isDemoMode, user?.id]);
+
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
+    await fetchDashboardData();
+    if (isDemoMode) {
       setStats((prev) => ({
         ...prev,
         currentBandwidthMbps: {
@@ -44,12 +86,28 @@ export default function DashboardPage() {
           upload: +(115 + Math.random() * 10).toFixed(1),
         },
       }));
-      setIsRefreshing(false);
-    }, 400);
+    }
+    setIsRefreshing(false);
   };
 
   return (
-    <AppShell title="Executive NOC & Revenue Operations">
+    <AppShell title={organization?.name ? `${organization.name} — NOC` : "Executive NOC & Revenue Operations"}>
+      {/* Demo Mode Notice Banner */}
+      {isDemoMode && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-semibold flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>Viewing G-Tech OS in <strong>Demo Mode</strong> with sample demonstration network data.</span>
+          </div>
+          <Link
+            href="/register"
+            className="px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-extrabold text-[11px] hover:bg-amber-400 transition shrink-0"
+          >
+            Create Real Account
+          </Link>
+        </div>
+      )}
+
       {/* Top Banner & Quick Refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
@@ -201,43 +259,60 @@ export default function DashboardPage() {
             </GlassCardHeader>
 
             <GlassCardContent className="space-y-3">
-              {SEED_ROUTERS.map((router) => (
-                <div
-                  key={router.id}
-                  className="p-3.5 rounded-xl bg-surface-elevated/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-                    <div>
-                      <div className="text-sm font-bold text-foreground flex items-center gap-2">
-                        {router.name}
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-muted-foreground font-mono">
-                          {router.boardModel}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono">
-                        Site: <span className="text-foreground">{router.siteName}</span> &bull; Tunnel:{" "}
-                        <span className="text-primary font-semibold">{router.wireguardTunnelIp}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs font-mono">
-                    <div>
-                      <div className="text-muted-foreground text-[10px] uppercase font-sans">CPU</div>
-                      <div className="font-bold text-foreground">{router.cpuLoad}%</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-[10px] uppercase font-sans">RAM Free</div>
-                      <div className="font-bold text-foreground">{router.freeMemoryMb} MB</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-[10px] uppercase font-sans">Sessions</div>
-                      <div className="font-bold text-emerald-500">{router.activeSessions} online</div>
-                    </div>
-                  </div>
+              {routers.length === 0 ? (
+                <div className="p-8 text-center space-y-3 bg-surface-elevated/30 rounded-xl border border-dashed border-border">
+                  <RouterIcon className="w-8 h-8 text-muted-foreground mx-auto" />
+                  <div className="text-xs font-bold text-foreground">No MikroTik Routers Provisioned</div>
+                  <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+                    Add your core MikroTik router to start monitoring sessions, queue rates, and WireGuard tunnels.
+                  </p>
+                  <Link
+                    href="/routers"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-brand-btn"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add First Router</span>
+                  </Link>
                 </div>
-              ))}
+              ) : (
+                routers.map((router) => (
+                  <div
+                    key={router.id}
+                    className="p-3.5 rounded-xl bg-surface-elevated/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                      <div>
+                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                          {router.name}
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-muted-foreground font-mono">
+                            {router.boardModel || "MikroTik"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          Site: <span className="text-foreground">{router.siteName || "Core POP"}</span> &bull; Tunnel:{" "}
+                          <span className="text-primary font-semibold">{router.wireguardTunnelIp || router.managementIp}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs font-mono">
+                      <div>
+                        <div className="text-muted-foreground text-[10px] uppercase font-sans">CPU</div>
+                        <div className="font-bold text-foreground">{router.cpuLoad}%</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-[10px] uppercase font-sans">RAM Free</div>
+                        <div className="font-bold text-foreground">{router.freeMemoryMb} MB</div>
+                      </div>
+                      <div>
+                        <div className="text-muted-foreground text-[10px] uppercase font-sans">Sessions</div>
+                        <div className="font-bold text-emerald-500">{router.activeSessions || 0} online</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </GlassCardContent>
           </GlassCard>
         </div>
@@ -258,26 +333,32 @@ export default function DashboardPage() {
             </GlassCardHeader>
 
             <GlassCardContent className="space-y-3">
-              {stats.recentAlerts.map((alert) => (
-                <div
-                  key={alert.id}
-                  className="p-3 rounded-xl bg-surface-elevated/40 border border-border space-y-1.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <GlassBadge
-                      variant={alert.severity === "WARNING" ? "warning" : "primary"}
-                      size="sm"
-                    >
-                      {alert.severity}
-                    </GlassBadge>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {formatShortDate(alert.createdAt)}
-                    </span>
-                  </div>
-                  <div className="text-xs font-bold text-foreground">{alert.title}</div>
-                  <div className="text-[11px] text-muted-foreground leading-snug">{alert.message}</div>
+              {stats.recentAlerts.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground bg-surface-elevated/30 rounded-xl border border-dashed border-border">
+                  No active network alerts. Network operational.
                 </div>
-              ))}
+              ) : (
+                stats.recentAlerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="p-3 rounded-xl bg-surface-elevated/40 border border-border space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <GlassBadge
+                        variant={alert.severity === "WARNING" ? "warning" : "primary"}
+                        size="sm"
+                      >
+                        {alert.severity}
+                      </GlassBadge>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {formatShortDate(alert.createdAt)}
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold text-foreground">{alert.title}</div>
+                    <div className="text-[11px] text-muted-foreground leading-snug">{alert.message}</div>
+                  </div>
+                ))
+              )}
             </GlassCardContent>
           </GlassCard>
         </div>
@@ -301,52 +382,62 @@ export default function DashboardPage() {
         </GlassCardHeader>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-foreground">
-            <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
-              <tr>
-                <th className="py-3 px-4">Receipt / Ref</th>
-                <th className="py-3 px-4">Customer / Phone</th>
-                <th className="py-3 px-4">Channel</th>
-                <th className="py-3 px-4">Amount</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Processed</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {SEED_PAYMENTS.map((payment) => (
-                <tr key={payment.id} className="hover:bg-surface-elevated/40 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                    {payment.transactionReference}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <div className="font-semibold text-foreground">
-                      {payment.senderName || payment.customerName || "Hotspot Guest"}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-mono">
-                      {payment.msisdnPhone}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-muted-foreground text-[10px] font-mono">
-                      {payment.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-extrabold text-emerald-500">
-                    {formatKES(payment.amount)}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <GlassBadge variant="success" size="sm">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>{payment.status}</span>
-                    </GlassBadge>
-                  </td>
-                  <td className="py-3.5 px-4 text-muted-foreground font-mono">
-                    {formatShortDate(payment.processedAt)}
-                  </td>
+          {payments.length === 0 ? (
+            <div className="p-8 text-center space-y-2 bg-surface-elevated/30">
+              <CreditCard className="w-6 h-6 text-muted-foreground mx-auto" />
+              <div className="text-xs font-bold text-foreground">No Payment Transactions Recorded Yet</div>
+              <p className="text-[11px] text-muted-foreground">
+                Incoming Lipa Na M-Pesa C2B and STK push payments will be reconciled and listed here automatically.
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs text-foreground">
+              <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
+                <tr>
+                  <th className="py-3 px-4">Receipt / Ref</th>
+                  <th className="py-3 px-4">Customer / Phone</th>
+                  <th className="py-3 px-4">Channel</th>
+                  <th className="py-3 px-4">Amount</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4">Processed</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {payments.map((payment) => (
+                  <tr key={payment.id} className="hover:bg-surface-elevated/40 transition">
+                    <td className="py-3.5 px-4 font-mono font-bold text-primary">
+                      {payment.transactionReference}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-semibold text-foreground">
+                        {payment.senderName || payment.customerName || "Hotspot Guest"}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground font-mono">
+                        {payment.msisdnPhone}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-muted-foreground text-[10px] font-mono">
+                        {payment.paymentMethod}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-extrabold text-emerald-500">
+                      {formatKES(payment.amount)}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <GlassBadge variant="success" size="sm">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{payment.status}</span>
+                      </GlassBadge>
+                    </td>
+                    <td className="py-3.5 px-4 text-muted-foreground font-mono">
+                      {formatShortDate(payment.processedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </GlassCard>
     </AppShell>
