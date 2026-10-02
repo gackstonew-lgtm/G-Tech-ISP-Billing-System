@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SEED_PLANS } from "@/lib/db/mock-db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");

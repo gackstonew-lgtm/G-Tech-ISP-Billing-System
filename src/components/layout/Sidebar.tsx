@@ -15,8 +15,11 @@ import {
   Wifi,
   Settings,
   Radio,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard (NOC)", icon: LayoutDashboard },
@@ -36,31 +39,36 @@ const EXTERNAL_LINKS = [
 
 export function Sidebar({ className, onClose }: { className?: string; onClose?: () => void }) {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   return (
-    <aside className={cn("flex flex-col h-full bg-[#0c1322] border-r border-slate-800/80 text-slate-300 w-64 select-none", className)}>
+    <aside className={cn("flex flex-col h-full bg-surface border-r border-border text-foreground w-64 select-none transition-colors duration-200", className)}>
       {/* Brand Header */}
-      <div className="flex items-center gap-3 px-6 h-16 border-b border-slate-800/80 bg-[#0c1322]/50">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-400 text-white shadow-lg shadow-sky-500/20 font-bold">
-          <Radio className="w-5 h-5 animate-pulse" />
-        </div>
-        <div>
-          <div className="font-bold text-white tracking-tight text-base flex items-center gap-1.5">
-            G-Tech OS
-            <span className="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
-              v1.0
-            </span>
+      <div className="flex items-center justify-between px-5 h-16 sm:h-20 border-b border-border bg-surface">
+        <Link href="/" className="flex items-center space-x-2.5 group">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
+            <Radio className="w-5 h-5 text-primary group-hover:scale-105 transition-transform" />
           </div>
-          <div className="text-xs text-slate-400 truncate max-w-[140px]">
-            G-Tech Fiber Ltd
+          <div>
+            <div className="flex items-center space-x-1.5">
+              <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight">
+                G-Tech OS
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                Delta
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground hidden sm:block truncate max-w-[130px]">
+              ISP Network Suite
+            </p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div>
-          <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+          <div className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
             ISP Operations
           </div>
           <nav className="space-y-1">
@@ -73,16 +81,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
                   href={item.href}
                   onClick={onClose}
                   className={cn(
-                    "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group",
+                    "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                     isActive
-                      ? "bg-sky-600/15 text-sky-400 border border-sky-500/20 shadow-sm"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
+                      ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
                   )}
                 >
                   <Icon
                     className={cn(
                       "w-4 h-4 transition-colors",
-                      isActive ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                      isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
                   <span>{item.label}</span>
@@ -93,7 +101,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </div>
 
         <div>
-          <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+          <div className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Subscriber Experience
           </div>
           <nav className="space-y-1">
@@ -106,16 +114,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
                   href={item.href}
                   onClick={onClose}
                   className={cn(
-                    "flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group",
+                    "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 group",
                     isActive
-                      ? "bg-sky-600/15 text-sky-400 border border-sky-500/20"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
+                      ? "bg-primary text-primary-foreground font-bold shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
                   )}
                 >
                   <Icon
                     className={cn(
                       "w-4 h-4",
-                      isActive ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                      isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                     )}
                   />
                   <span>{item.label}</span>
@@ -126,25 +134,29 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         </div>
       </div>
 
-      {/* Footer Tenant Info */}
-      <div className="p-3 border-t border-slate-800/80 bg-[#080d18]">
-        <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+      {/* Footer Tenant Info & Theme Switcher */}
+      <div className="p-3 border-t border-border bg-surface-subtle">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-surface border border-border shadow-xs">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-sky-400 border border-slate-600">
+            <div className="w-8 h-8 rounded-lg bg-surface-elevated flex items-center justify-center font-bold text-xs text-primary border border-border">
               BG
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-slate-200 truncate">
+              <div className="text-xs font-bold text-foreground truncate">
                 Baraka Gackstone
               </div>
-              <div className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+              <div className="text-[10px] text-emerald-500 flex items-center gap-1 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                 ISP Owner
               </div>
             </div>
           </div>
-          <button className="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-slate-800 transition">
-            <Settings className="w-4 h-4" />
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className="text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-surface-elevated transition border border-transparent hover:border-border"
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-primary" />}
           </button>
         </div>
       </div>

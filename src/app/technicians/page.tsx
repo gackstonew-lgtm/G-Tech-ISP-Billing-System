@@ -17,6 +17,8 @@ import {
 import { SEED_WORK_ORDERS, SEED_USERS } from "@/lib/db/mock-db";
 import { WorkOrder, WorkOrderStatus } from "@/types";
 import { formatShortDate } from "@/lib/utils";
+import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
+import { GlassBadge } from "@/components/ui/GlassBadge";
 
 export default function TechniciansPage() {
   const [orders, setOrders] = useState<WorkOrder[]>(SEED_WORK_ORDERS);
@@ -71,16 +73,16 @@ export default function TechniciansPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Field Operations & Work Orders
+          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
+            Field Operations &amp; Work Orders
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Dispatch technicians, manage optical power levels, drop fiber splicing, and ONU installations
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-900/30 transition"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
         >
           <Plus className="w-4 h-4" />
           <span>New Work Order</span>
@@ -90,92 +92,90 @@ export default function TechniciansPage() {
       {/* Work Orders Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {orders.map((order) => (
-          <div
-            key={order.id}
-            className="p-6 rounded-2xl bg-[#0e1626] border border-slate-800/80 shadow-xl space-y-4 relative flex flex-col justify-between"
-          >
-            <div>
+          <GlassCard key={order.id} className="flex flex-col justify-between" hoverEffect>
+            <GlassCardContent className="p-6 space-y-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <span className="font-mono text-xs font-bold text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded border border-sky-800/40">
+                  <span className="font-mono text-xs font-extrabold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
                     {order.ticketNumber}
                   </span>
-                  <h3 className="font-bold text-white text-base mt-2">
+                  <h3 className="font-extrabold text-foreground text-base mt-2">
                     {order.title}
                   </h3>
                 </div>
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                <GlassBadge
+                  variant={
                     order.priority === "CRITICAL"
-                      ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                      ? "destructive"
                       : order.priority === "HIGH"
-                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                      : "bg-slate-800 text-slate-300"
-                  }`}
+                      ? "warning"
+                      : "neutral"
+                  }
+                  size="sm"
                 >
                   {order.priority}
-                </span>
+                </GlassBadge>
               </div>
 
-              <p className="text-xs text-slate-300 mt-2 leading-relaxed bg-slate-900/50 p-3 rounded-lg border border-slate-800/60">
+              <p className="text-xs text-foreground mt-2 leading-relaxed bg-surface-elevated/60 p-3.5 rounded-xl border border-border">
                 {order.description}
               </p>
 
               {/* Customer and Location Info */}
-              <div className="mt-4 space-y-2 text-xs text-slate-300">
+              <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-semibold text-slate-200">{order.customerName}</span>
+                  <User className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="font-bold text-foreground">{order.customerName}</span>
                 </div>
                 <div className="flex items-center gap-2 font-mono">
-                  <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-slate-300">{order.customerPhone}</span>
+                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-foreground">{order.customerPhone}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-slate-400">{order.customerAddress}</span>
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">{order.customerAddress}</span>
                 </div>
               </div>
-            </div>
+            </GlassCardContent>
 
             {/* Status & Actions */}
-            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-              <div className="text-xs text-slate-400">
-                Tech: <span className="font-semibold text-sky-400">{order.assignedTechnicianName}</span>
+            <div className="p-4 border-t border-border bg-surface-elevated/40 flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                Tech: <span className="font-bold text-primary">{order.assignedTechnicianName}</span>
               </div>
               <div className="flex items-center gap-2">
                 {order.status !== "COMPLETED" ? (
                   <button
                     onClick={() => handleUpdateStatus(order.id, "COMPLETED")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Mark Done</span>
                   </button>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Completed
-                  </span>
+                  <GlassBadge variant="success" size="sm">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Completed</span>
+                  </GlassBadge>
                 )}
               </div>
             </div>
-          </div>
+          </GlassCard>
         ))}
       </div>
 
       {/* New Work Order Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-[#0e1626] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-elevated/70">
               <div className="flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-sky-400" />
-                <h3 className="font-bold text-white text-base">New Field Work Order</h3>
+                <Wrench className="w-5 h-5 text-primary" />
+                <h3 className="font-extrabold text-foreground text-base">New Field Work Order</h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -183,7 +183,7 @@ export default function TechniciansPage() {
 
             <form onSubmit={handleCreateOrder} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                   Ticket Title *
                 </label>
                 <input
@@ -192,13 +192,13 @@ export default function TechniciansPage() {
                   placeholder="e.g. Fiber Line Cut / ONU Replacement"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     Customer Name *
                   </label>
                   <input
@@ -206,11 +206,11 @@ export default function TechniciansPage() {
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     Customer Phone *
                   </label>
                   <input
@@ -219,13 +219,13 @@ export default function TechniciansPage() {
                     placeholder="0712345678"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500"
+                    className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                   Physical Installation Address
                 </label>
                 <input
@@ -234,12 +234,12 @@ export default function TechniciansPage() {
                   placeholder="e.g. Parklands, 3rd Parklands Ave, House 14"
                   value={customerAddress}
                   onChange={(e) => setCustomerAddress(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                   Technical Instructions
                 </label>
                 <textarea
@@ -248,7 +248,7 @@ export default function TechniciansPage() {
                   placeholder="Optical power threshold, ONU serial numbers, drop cable route..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500 leading-relaxed"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-xs text-foreground focus:outline-none focus:border-primary leading-relaxed"
                 />
               </div>
 
@@ -256,13 +256,13 @@ export default function TechniciansPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                  className="px-4 py-2 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-foreground text-xs font-bold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-900/30 transition"
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
                 >
                   Dispatch Work Order
                 </button>

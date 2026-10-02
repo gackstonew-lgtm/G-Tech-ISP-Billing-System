@@ -27,6 +27,8 @@ import {
 } from "@/lib/db/mock-db";
 import { formatKES, formatShortDate } from "@/lib/utils";
 import Link from "next/link";
+import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
+import { GlassBadge } from "@/components/ui/GlassBadge";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(getSeedNOCStats());
@@ -35,7 +37,6 @@ export default function DashboardPage() {
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      // Simulate real-time metrics update
       setStats((prev) => ({
         ...prev,
         currentBandwidthMbps: {
@@ -52,25 +53,25 @@ export default function DashboardPage() {
       {/* Top Banner & Quick Refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
             Network Operations Center (NOC)
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Real-time subscriber state, MikroTik router fleet telemetry, and M-Pesa revenue stream
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-elevated text-foreground text-xs font-semibold border border-border shadow-xs transition"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-sky-400" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-primary" : ""}`} />
             <span>{isRefreshing ? "Syncing..." : "Sync Network"}</span>
           </button>
           <Link
             href="/vouchers"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-md shadow-sky-900/30 transition"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
           >
             <Ticket className="w-3.5 h-3.5" />
             <span>Generate Vouchers</span>
@@ -81,260 +82,265 @@ export default function DashboardPage() {
       {/* 4 Primary Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Revenue Today */}
-        <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              Revenue (Today)
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <CreditCard className="w-4 h-4" />
+        <GlassCard hoverEffect>
+          <GlassCardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Revenue (Today)
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center">
+                <CreditCard className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-white">
-              {formatKES(stats.revenueToday)}
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-foreground">
+                {formatKES(stats.revenueToday)}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-500 font-semibold">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>{formatKES(stats.revenueThisMonth)} this month</span>
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-400">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>{formatKES(stats.revenueThisMonth)} this month</span>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
-        </div>
+          </GlassCardContent>
+        </GlassCard>
 
         {/* Card 2: Active Subscribers */}
-        <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              Active Subscribers
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center">
-              <Users className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-white">
-              {stats.activeSubscribers}{" "}
-              <span className="text-xs font-normal text-slate-400">
-                / {stats.totalSubscribers} total
+        <GlassCard hoverEffect>
+          <GlassCardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Active Subscribers
               </span>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-amber-400">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{stats.expiringIn24h} expiring in 24h</span>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-foreground">
+                {stats.activeSubscribers}{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  / {stats.totalSubscribers} total
+                </span>
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-500 font-semibold">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{stats.expiringIn24h} expiring in 24h</span>
+              </div>
             </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-sky-500/5 rounded-full blur-xl pointer-events-none" />
-        </div>
+          </GlassCardContent>
+        </GlassCard>
 
-        {/* Card 3: Online Sessions (PPPoE + Hotspot) */}
-        <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              Active Online Sessions
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-              <Wifi className="w-4 h-4" />
+        {/* Card 3: Online Sessions */}
+        <GlassCard hoverEffect>
+          <GlassCardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Active Online Sessions
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+                <Wifi className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-white">
-              {stats.onlinePppoe + stats.onlineHotspot}
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-foreground">
+                {stats.onlinePppoe + stats.onlineHotspot}
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+                <span className="text-primary">{stats.onlinePppoe} PPPoE</span>
+                <span>&bull;</span>
+                <span className="text-emerald-500">{stats.onlineHotspot} Hotspot</span>
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-              <span className="text-cyan-400 font-semibold">{stats.onlinePppoe} PPPoE</span>
-              <span>&bull;</span>
-              <span className="text-teal-400 font-semibold">{stats.onlineHotspot} Hotspot</span>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-cyan-500/5 rounded-full blur-xl pointer-events-none" />
-        </div>
+          </GlassCardContent>
+        </GlassCard>
 
-        {/* Card 4: Current Fleet Traffic */}
-        <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 shadow-lg relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-              Live Bandwidth
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
-              <Activity className="w-4 h-4" />
+        {/* Card 4: Bandwidth */}
+        <GlassCard hoverEffect>
+          <GlassCardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Live Bandwidth
+              </span>
+              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+                <Activity className="w-4 h-4" />
+              </div>
             </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-white flex items-center gap-2">
-              <span>{stats.currentBandwidthMbps.download}</span>
-              <span className="text-xs font-medium text-slate-400">Mbps (Rx)</span>
+            <div className="mt-3">
+              <div className="text-2xl font-extrabold text-foreground flex items-center gap-1.5">
+                <span>{stats.currentBandwidthMbps.download}</span>
+                <span className="text-xs font-semibold text-muted-foreground">Mbps (Rx)</span>
+              </div>
+              <div className="mt-1 flex items-center gap-2 text-xs text-primary font-semibold">
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>{stats.currentBandwidthMbps.upload} Mbps (Tx)</span>
+                <span className="text-muted-foreground">&bull; {stats.onlineRouters} Routers</span>
+              </div>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-purple-400">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>{stats.currentBandwidthMbps.upload} Mbps (Tx)</span>
-              <span className="text-slate-400">&bull; {stats.onlineRouters} Routers Up</span>
-            </div>
-          </div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-purple-500/5 rounded-full blur-xl pointer-events-none" />
-        </div>
+          </GlassCardContent>
+        </GlassCard>
       </div>
 
-      {/* Network Health & Fleet Overview */}
+      {/* Network Health & Incident Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* MikroTik Fleet Status (2 Cols) */}
-        <div className="lg:col-span-2 p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <RouterIcon className="w-4 h-4 text-sky-400" />
-              <h3 className="text-sm font-bold text-white tracking-tight">
-                MikroTik Fleet & WireGuard Health
-              </h3>
-            </div>
-            <Link
-              href="/routers"
-              className="text-xs font-medium text-sky-400 hover:text-sky-300 transition"
-            >
-              Manage Fleet &rarr;
-            </Link>
-          </div>
-
-          <div className="space-y-3">
-            {SEED_ROUTERS.map((router) => (
-              <div
-                key={router.id}
-                className="p-3.5 rounded-lg bg-slate-900/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                  <div>
-                    <div className="text-sm font-semibold text-white flex items-center gap-2">
-                      {router.name}
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
-                        {router.boardModel}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Site: <span className="text-slate-300">{router.siteName}</span> &bull; Tunnel:{" "}
-                      <span className="font-mono text-sky-400">{router.wireguardTunnelIp}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 text-xs">
-                  <div>
-                    <div className="text-slate-400 text-[10px] uppercase">CPU Load</div>
-                    <div className="font-bold text-slate-200">{router.cpuLoad}%</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-[10px] uppercase">RAM Free</div>
-                    <div className="font-bold text-slate-200">{router.freeMemoryMb} MB</div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-[10px] uppercase">Sessions</div>
-                    <div className="font-bold text-emerald-400">{router.activeSessions} online</div>
-                  </div>
-                </div>
+        {/* Fleet Status (2 Cols) */}
+        <div className="lg:col-span-2">
+          <GlassCard>
+            <GlassCardHeader>
+              <div className="flex items-center gap-2">
+                <RouterIcon className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-bold text-foreground tracking-tight">
+                  MikroTik Fleet &amp; WireGuard Health
+                </h3>
               </div>
-            ))}
-          </div>
+              <Link
+                href="/routers"
+                className="text-xs font-bold text-primary hover:text-primary-hover transition"
+              >
+                Manage Fleet &rarr;
+              </Link>
+            </GlassCardHeader>
+
+            <GlassCardContent className="space-y-3">
+              {SEED_ROUTERS.map((router) => (
+                <div
+                  key={router.id}
+                  className="p-3.5 rounded-xl bg-surface-elevated/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+                    <div>
+                      <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                        {router.name}
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-muted-foreground font-mono">
+                          {router.boardModel}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        Site: <span className="text-foreground">{router.siteName}</span> &bull; Tunnel:{" "}
+                        <span className="text-primary font-semibold">{router.wireguardTunnelIp}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs font-mono">
+                    <div>
+                      <div className="text-muted-foreground text-[10px] uppercase font-sans">CPU</div>
+                      <div className="font-bold text-foreground">{router.cpuLoad}%</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground text-[10px] uppercase font-sans">RAM Free</div>
+                      <div className="font-bold text-foreground">{router.freeMemoryMb} MB</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground text-[10px] uppercase font-sans">Sessions</div>
+                      <div className="font-bold text-emerald-500">{router.activeSessions} online</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </GlassCardContent>
+          </GlassCard>
         </div>
 
-        {/* Live Network Incident & Alarm Feed (1 Col) */}
-        <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-white tracking-tight">
-                Network Alerts & Audits
-              </h3>
-            </div>
-            <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-              Live Feed
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {stats.recentAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="p-3 rounded-lg bg-slate-900/40 border border-slate-800/80 space-y-1"
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                      alert.severity === "WARNING"
-                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                        : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                    }`}
-                  >
-                    {alert.severity}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {formatShortDate(alert.createdAt)}
-                  </span>
-                </div>
-                <div className="text-xs font-semibold text-slate-200">{alert.title}</div>
-                <div className="text-[11px] text-slate-400 leading-snug">{alert.message}</div>
+        {/* Network Alerts & Audits (1 Col) */}
+        <div>
+          <GlassCard>
+            <GlassCardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-foreground tracking-tight">
+                  Network Alerts &amp; Audits
+                </h3>
               </div>
-            ))}
-          </div>
+              <GlassBadge variant="neutral" size="sm">
+                Live Feed
+              </GlassBadge>
+            </GlassCardHeader>
+
+            <GlassCardContent className="space-y-3">
+              {stats.recentAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="p-3 rounded-xl bg-surface-elevated/40 border border-border space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <GlassBadge
+                      variant={alert.severity === "WARNING" ? "warning" : "primary"}
+                      size="sm"
+                    >
+                      {alert.severity}
+                    </GlassBadge>
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      {formatShortDate(alert.createdAt)}
+                    </span>
+                  </div>
+                  <div className="text-xs font-bold text-foreground">{alert.title}</div>
+                  <div className="text-[11px] text-muted-foreground leading-snug">{alert.message}</div>
+                </div>
+              ))}
+            </GlassCardContent>
+          </GlassCard>
         </div>
       </div>
 
       {/* Recent M-Pesa Transactions Stream */}
-      <div className="p-5 rounded-xl bg-[#0e1626] border border-slate-800/80 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <GlassCard>
+        <GlassCardHeader>
           <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white tracking-tight">
-              Real-Time M-Pesa & Mobile Money Transactions
+            <CreditCard className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-bold text-foreground tracking-tight">
+              Real-Time M-Pesa &amp; Mobile Money Transactions
             </h3>
           </div>
           <Link
             href="/billing"
-            className="text-xs font-medium text-sky-400 hover:text-sky-300 transition"
+            className="text-xs font-bold text-primary hover:text-primary-hover transition"
           >
             View All Ledgers &rarr;
           </Link>
-        </div>
+        </GlassCardHeader>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="border-b border-slate-800 text-[11px] uppercase text-slate-400 font-semibold bg-slate-900/40">
+          <table className="w-full text-left text-xs text-foreground">
+            <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
               <tr>
-                <th className="py-2.5 px-3">Receipt / Ref</th>
-                <th className="py-2.5 px-3">Customer / Phone</th>
-                <th className="py-2.5 px-3">Channel</th>
-                <th className="py-2.5 px-3">Amount</th>
-                <th className="py-2.5 px-3">Status</th>
-                <th className="py-2.5 px-3">Processed</th>
+                <th className="py-3 px-4">Receipt / Ref</th>
+                <th className="py-3 px-4">Customer / Phone</th>
+                <th className="py-3 px-4">Channel</th>
+                <th className="py-3 px-4">Amount</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">Processed</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-border">
               {SEED_PAYMENTS.map((payment) => (
-                <tr key={payment.id} className="hover:bg-slate-900/40 transition">
-                  <td className="py-3 px-3 font-mono font-semibold text-sky-400">
+                <tr key={payment.id} className="hover:bg-surface-elevated/40 transition">
+                  <td className="py-3.5 px-4 font-mono font-bold text-primary">
                     {payment.transactionReference}
                   </td>
-                  <td className="py-3 px-3">
-                    <div className="font-medium text-slate-200">
+                  <td className="py-3.5 px-4">
+                    <div className="font-semibold text-foreground">
                       {payment.senderName || payment.customerName || "Hotspot Guest"}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
+                    <div className="text-[10px] text-muted-foreground font-mono">
                       {payment.msisdnPhone}
                     </div>
                   </td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-mono">
+                  <td className="py-3.5 px-4">
+                    <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-muted-foreground text-[10px] font-mono">
                       {payment.paymentMethod}
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-bold text-emerald-400">
+                  <td className="py-3.5 px-4 font-extrabold text-emerald-500">
                     {formatKES(payment.amount)}
                   </td>
-                  <td className="py-3 px-3">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                  <td className="py-3.5 px-4">
+                    <GlassBadge variant="success" size="sm">
                       <CheckCircle2 className="w-3 h-3" />
-                      {payment.status}
-                    </span>
+                      <span>{payment.status}</span>
+                    </GlassBadge>
                   </td>
-                  <td className="py-3 px-3 text-slate-400">
+                  <td className="py-3.5 px-4 text-muted-foreground font-mono">
                     {formatShortDate(payment.processedAt)}
                   </td>
                 </tr>
@@ -342,7 +348,7 @@ export default function DashboardPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </GlassCard>
     </AppShell>
   );
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SEED_CUSTOMERS } from "@/lib/db/mock-db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -43,11 +45,14 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    return NextResponse.json({
-      success: true,
-      message: "Customer provisioned successfully into FreeRADIUS & MikroTik",
-      data: newCustomer,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Customer provisioned successfully into FreeRADIUS & MikroTik",
+        data: newCustomer,
+      },
+      { status: 201 }
+    );
   } catch (err: unknown) {
     const e = err as Error;
     return NextResponse.json(

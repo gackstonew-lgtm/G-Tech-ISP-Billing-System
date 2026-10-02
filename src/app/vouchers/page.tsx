@@ -24,6 +24,8 @@ import {
 import { HotspotVoucher, VoucherBatch } from "@/types";
 import { VoucherGenerator } from "@/lib/vouchers/generator";
 import { formatKES, formatShortDate } from "@/lib/utils";
+import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
+import { GlassBadge } from "@/components/ui/GlassBadge";
 
 export default function VouchersPage() {
   const [vouchers, setVouchers] = useState<HotspotVoucher[]>(SEED_HOTSPOT_VOUCHERS);
@@ -85,24 +87,24 @@ export default function VouchersPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
             Hotspot Voucher Engine
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Generate cryptographically unique access tokens, format thermal receipts, and print A4 cards
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setIsPrintModalOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface hover:bg-surface-elevated text-foreground text-xs font-bold border border-border shadow-xs transition"
           >
-            <Printer className="w-4 h-4 text-emerald-400" />
-            <span>Print Cards / Thermal</span>
+            <Printer className="w-4 h-4 text-emerald-500" />
+            <span>Print Cards / POS</span>
           </button>
           <button
             onClick={() => setIsGenerateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-900/30 transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
           >
             <Plus className="w-4 h-4" />
             <span>Generate Batch</span>
@@ -111,27 +113,27 @@ export default function VouchersPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-[#0e1626] border border-slate-800/80">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-surface border border-border shadow-xs">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search voucher code (e.g. GT1H)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500"
+            className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface-elevated border border-border text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto">
           {["ALL", "AVAILABLE", "USED", "EXPIRED"].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                 statusFilter === status
-                  ? "bg-sky-600 text-white font-semibold"
-                  : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
+                  ? "bg-primary text-primary-foreground shadow-xs"
+                  : "bg-surface-elevated text-muted-foreground hover:text-foreground border border-border"
               }`}
             >
               {status}
@@ -141,10 +143,10 @@ export default function VouchersPage() {
       </div>
 
       {/* Vouchers Table */}
-      <div className="rounded-xl bg-[#0e1626] border border-slate-800/80 overflow-hidden shadow-xl">
+      <GlassCard>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="border-b border-slate-800 text-[11px] uppercase text-slate-400 font-semibold bg-slate-900/50">
+          <table className="w-full text-left text-xs text-foreground">
+            <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
               <tr>
                 <th className="py-3 px-4">Voucher Code</th>
                 <th className="py-3 px-4">Plan / Duration</th>
@@ -154,46 +156,47 @@ export default function VouchersPage() {
                 <th className="py-3 px-4">Generated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-mono">
+            <tbody className="divide-y divide-border font-mono">
               {filteredVouchers.map((v) => (
-                <tr key={v.id} className="hover:bg-slate-900/40 transition">
-                  <td className="py-3 px-4">
-                    <span className="font-bold text-sky-400 tracking-wider bg-sky-950/40 px-2 py-1 rounded border border-sky-800/40">
+                <tr key={v.id} className="hover:bg-surface-elevated/40 transition">
+                  <td className="py-3.5 px-4">
+                    <span className="font-extrabold text-primary tracking-wider bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
                       {v.code}
                     </span>
                   </td>
-                  <td className="py-3 px-4 font-sans text-slate-200">
-                    <div className="font-semibold">{v.planName}</div>
-                    <div className="text-[10px] text-slate-400">{v.planDuration}</div>
+                  <td className="py-3.5 px-4 font-sans text-foreground">
+                    <div className="font-bold">{v.planName}</div>
+                    <div className="text-[10px] text-muted-foreground">{v.planDuration}</div>
                   </td>
-                  <td className="py-3 px-4 font-sans font-bold text-emerald-400">
+                  <td className="py-3.5 px-4 font-sans font-extrabold text-emerald-500">
                     {formatKES(v.planPrice || 10)}
                   </td>
-                  <td className="py-3 px-4 font-sans">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                  <td className="py-3.5 px-4 font-sans">
+                    <GlassBadge
+                      variant={
                         v.status === "AVAILABLE"
-                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                          ? "success"
                           : v.status === "USED"
-                          ? "bg-sky-500/15 text-sky-400 border border-sky-500/30"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
+                          ? "primary"
+                          : "neutral"
+                      }
+                      size="sm"
                     >
                       {v.status === "AVAILABLE" && <CheckCircle2 className="w-3 h-3" />}
-                      {v.status}
-                    </span>
+                      <span>{v.status}</span>
+                    </GlassBadge>
                   </td>
-                  <td className="py-3 px-4 text-[11px] text-slate-400 font-sans">
+                  <td className="py-3.5 px-4 text-[11px] text-muted-foreground font-sans">
                     {v.usedByPhone ? (
                       <div>
-                        <span>Used by {v.usedByPhone}</span>
-                        <div className="text-[10px] text-slate-500 font-mono">{v.usedMacAddress}</div>
+                        <span className="text-foreground font-semibold">Used by {v.usedByPhone}</span>
+                        <div className="text-[10px] font-mono text-muted-foreground">{v.usedMacAddress}</div>
                       </div>
                     ) : (
-                      <span className="italic text-slate-500">Unused</span>
+                      <span className="italic text-muted-foreground">Unused</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 font-sans text-slate-400">
+                  <td className="py-3.5 px-4 font-sans text-muted-foreground">
                     {formatShortDate(v.createdAt)}
                   </td>
                 </tr>
@@ -201,20 +204,20 @@ export default function VouchersPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Generate Batch Modal */}
       {isGenerateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-[#0e1626] border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-elevated/70">
               <div className="flex items-center gap-2">
-                <Ticket className="w-5 h-5 text-sky-400" />
-                <h3 className="font-bold text-white text-base">Generate Voucher Batch</h3>
+                <Ticket className="w-5 h-5 text-primary" />
+                <h3 className="font-extrabold text-foreground text-base">Generate Voucher Batch</h3>
               </div>
               <button
                 onClick={() => setIsGenerateModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -222,13 +225,13 @@ export default function VouchersPage() {
 
             <form onSubmit={handleGenerateBatch} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                   Hotspot Package *
                 </label>
                 <select
                   value={selectedPlanId}
                   onChange={(e) => setSelectedPlanId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                  className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-border text-xs text-foreground focus:outline-none focus:border-primary font-semibold"
                 >
                   {hotspotPlans.map((plan) => (
                     <option key={plan.id} value={plan.id}>
@@ -240,13 +243,13 @@ export default function VouchersPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     Quantity *
                   </label>
                   <select
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-sky-500"
+                    className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-border text-xs text-foreground focus:outline-none focus:border-primary font-semibold"
                   >
                     <option value={10}>10 Vouchers</option>
                     <option value={25}>25 Vouchers</option>
@@ -255,14 +258,14 @@ export default function VouchersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
                     Prefix
                   </label>
                   <input
                     type="text"
                     value={prefix}
                     onChange={(e) => setPrefix(e.target.value.toUpperCase())}
-                    className="w-full px-3.5 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500 font-mono uppercase"
+                    className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary font-mono uppercase"
                   />
                 </div>
               </div>
@@ -271,13 +274,13 @@ export default function VouchersPage() {
                 <button
                   type="button"
                   onClick={() => setIsGenerateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                  className="px-4 py-2 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-foreground text-xs font-bold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-900/30 transition"
+                  className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
                 >
                   Generate {quantity} Tokens
                 </button>
@@ -290,60 +293,60 @@ export default function VouchersPage() {
       {/* Print Preview Modal */}
       {isPrintModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-[#0e1626] border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/60 no-print">
+          <div className="bg-surface border border-border rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-elevated/70 no-print">
               <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-bold text-white text-base">
-                  Voucher Print Sheet (A4 & POS Thermal Preview)
+                <Printer className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-extrabold text-foreground text-base">
+                  Voucher Print Sheet (A4 &amp; POS Thermal Preview)
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrint}
-                  className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md transition"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Print Now</span>
                 </button>
                 <button
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="text-slate-400 hover:text-white ml-2"
+                  className="text-muted-foreground hover:text-foreground ml-2"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            <div className="p-6 flex-1 overflow-y-auto bg-slate-950">
+            <div className="p-6 flex-1 overflow-y-auto bg-surface-subtle">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {vouchers.slice(0, 12).map((v) => (
                   <div
                     key={v.id}
-                    className="voucher-card p-3.5 rounded-xl bg-slate-900 border border-dashed border-slate-700 text-slate-100 flex flex-col justify-between space-y-2.5 shadow-sm"
+                    className="voucher-card p-4 rounded-xl bg-surface border border-dashed border-border text-foreground flex flex-col justify-between space-y-2.5 shadow-sm"
                   >
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                    <div className="flex items-center justify-between border-b border-border pb-1.5">
                       <div className="flex items-center gap-1.5">
-                        <Wifi className="w-3.5 h-3.5 text-sky-400" />
+                        <Wifi className="w-3.5 h-3.5 text-primary" />
                         <span className="text-[11px] font-bold tracking-tight">G-TECH WIFI</span>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-400">
+                      <span className="text-[10px] font-bold text-emerald-500">
                         {formatKES(v.planPrice || 10)}
                       </span>
                     </div>
 
                     <div className="text-center py-1">
-                      <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                         Voucher Code
                       </div>
-                      <div className="font-mono text-sm font-extrabold text-white tracking-wider mt-0.5">
+                      <div className="font-mono text-sm font-extrabold text-foreground tracking-wider mt-0.5">
                         {v.code}
                       </div>
                     </div>
 
-                    <div className="border-t border-slate-800 pt-1 text-[9px] text-slate-400 text-center leading-tight">
+                    <div className="border-t border-border pt-1 text-[9px] text-muted-foreground text-center leading-tight">
                       <div>Plan: {v.planName}</div>
-                      <div>Connect: <span className="font-bold text-slate-300">G-Tech_FreeWiFi</span></div>
+                      <div>SSID: <span className="font-bold text-foreground">G-Tech_FreeWiFi</span></div>
                     </div>
                   </div>
                 ))}
