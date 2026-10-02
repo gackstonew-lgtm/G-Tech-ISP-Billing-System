@@ -1,0 +1,34 @@
+<svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .logo-text { fill: #000000; }
+    .logo-sub { fill: #000000; }
+    .logo-desc { fill: #000000; }
+
+    @media (prefers-color-scheme: dark) {
+      .logo-text { fill: #FFFFFF; }
+      .logo-sub { fill: #FFFFFF; }
+      .logo-desc { fill: #E2E8F0; }
+    }
+  </style>
+  <!-- NexaNet Wi-Fi / Network Signal House Icon (Permanent Brand Blue #0066FF) -->
+  <g transform="translate(150, 40) scale(1.0)">
+    <!-- Outer Arc -->
+    <path d="M32 32C107.1 32 168 92.9 168 168H126C126 116.1 83.9 74 32 74V32Z" fill="#0066FF"/>
+    <!-- Inner Arc -->
+    <path d="M32 90C75.1 90 110 124.9 110 168H76C76 143.7 56.3 124 32 124V90Z" fill="#0066FF"/>
+    <!-- Signal Dot -->
+    <circle cx="50" cy="150" r="16" fill="#0066FF"/>
+    <!-- Right vertical N bar -->
+    <path d="M126 32H168V168H126V32Z" fill="#0066FF"/>
+  </g>
+  <!-- Theme-Adaptive Typography -->
+  <text x="250" y="270" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Inter', sans-serif" font-weight="800" font-size="52" class="logo-text">
+    NexaNet
+  </text>
+  <text x="250" y="325" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Inter', sans-serif" font-weight="800" font-size="42" class="logo-sub">
+    Technologies
+  </text>
+  <text x="250" y="375" text-anchor="middle" font-family="'Plus Jakarta Sans', 'Inter', sans-serif" font-weight="700" font-size="28" class="logo-desc" letter-spacing="1">
+    — ISP Network &amp; Billing —
+  </text>
+</svg>

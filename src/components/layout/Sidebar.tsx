@@ -14,19 +14,20 @@ import {
   Activity,
   UserCheck,
   Wifi,
-  Radio,
   Sun,
   Moon,
   LogOut,
   Sparkles,
   LogIn,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
+import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard (NOC)", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Operations Dashboard", icon: LayoutDashboard },
   { href: "/customers", label: "Subscribers", icon: Users },
   { href: "/routers", label: "MikroTik Fleet", icon: RouterIcon },
   { href: "/plans", label: "Service Plans", icon: Layers },
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { href: "/billing", label: "Billing & M-Pesa", icon: CreditCard },
   { href: "/technicians", label: "Field Operations", icon: Wrench },
   { href: "/monitoring", label: "Live Telemetry", icon: Activity },
+  { href: "/settings", label: "Settings & Config", icon: Settings },
 ];
 
 const EXTERNAL_LINKS = [
@@ -53,7 +55,7 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
         .join("")
         .substring(0, 2)
         .toUpperCase()
-    : "GT";
+    : "NN";
 
   return (
     <aside
@@ -64,36 +66,16 @@ export function Sidebar({ className, onClose }: { className?: string; onClose?: 
     >
       {/* Brand Header */}
       <div className="flex items-center justify-between px-5 h-16 sm:h-20 border-b border-border bg-surface">
-        <Link href="/" className="flex items-center space-x-2.5 group">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
-            <Radio className="w-5 h-5 text-primary group-hover:scale-105 transition-transform" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-1.5">
-              <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight">
-                G-Tech OS
-              </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                Delta
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground hidden sm:block truncate max-w-[130px]">
-              {organization?.name || "ISP Network Suite"}
-            </p>
-          </div>
+        <Link href="/" className="flex items-center group">
+          <NexaNetLogo variant="horizontal" />
         </Link>
       </div>
 
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div>
-          <div className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
+          <div className="px-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
             <span>ISP Operations</span>
-            {isDemoMode && (
-              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                Demo
-              </span>
-            )}
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map((item) => {

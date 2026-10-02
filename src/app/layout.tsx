@@ -4,15 +4,20 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "G-Tech ISP OS | Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS",
-  description: "Modern Kenyan ISP & WISP Hotspot + PPPoE Billing & Network Management Operating System.",
-  keywords: ["ISP Billing Kenya", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
-  authors: [{ name: "G-Tech Networks" }],
+  title: "NexaNet Technologies | ISP Network & Billing",
+  description: "NexaNet Technologies ISP Network & Billing — Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS Platform.",
+  keywords: ["NexaNet Technologies", "ISP Billing", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
+  authors: [{ name: "NexaNet Technologies" }],
   manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0251b8",
+  themeColor: "#0066FF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,

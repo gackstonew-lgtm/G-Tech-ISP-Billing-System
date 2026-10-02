@@ -2,9 +2,10 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Radio, Mail, ArrowRight, ShieldCheck, Sun, Moon, CheckCircle2 } from "lucide-react";
+import { Mail, ArrowRight, ShieldCheck, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -42,16 +43,8 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between antialiased selection:bg-primary/20 selection:text-primary transition-colors duration-200">
       <header className="w-full border-b border-border-subtle bg-surface/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
-              <Radio className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="font-extrabold text-lg text-foreground tracking-tight">G-Tech</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                Delta
-              </span>
-            </div>
+          <Link href="/" className="flex items-center group">
+            <NexaNetLogo variant="horizontal" />
           </Link>
 
           <button
@@ -78,7 +71,7 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
-          <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-border shadow-xl space-y-5">
+          <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-border shadow-xs space-y-5">
             {error && (
               <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold">
                 {error}
@@ -104,7 +97,7 @@ export default function ForgotPasswordPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@yourisp.com"
+                    placeholder="Email address"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
                   />
                 </div>
@@ -136,7 +129,7 @@ export default function ForgotPasswordPage() {
       </main>
 
       <footer className="py-4 border-t border-border bg-surface-subtle text-center text-xs text-muted-foreground">
-        &copy; 2025 G-Tech ISP Operating System. Carrier-Grade Network Suite.
+        &copy; 2026 NexaNet Technologies ISP Network &amp; Billing.
       </footer>
     </div>
   );

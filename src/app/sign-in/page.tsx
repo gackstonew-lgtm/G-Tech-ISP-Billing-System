@@ -3,15 +3,30 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Radio, Lock, Mail, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, LogIn } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, User, Building, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function SignInPage() {
+  const [activeTab, setActiveTab] = useState<"SIGN_IN" | "REGISTER">("SIGN_IN");
+  
+  // Sign In State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Register State
+  const [fullName, setFullName] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { theme, toggleTheme } = useTheme();
@@ -21,17 +36,18 @@ export default function SignInPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     setIsSubmitting(true);
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { data, authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-      });
+      }) as any;
 
       if (authError) {
-        if (authError.message.includes("Invalid login credentials")) {
+        if (authError.message?.includes("Invalid login credentials")) {
           setError("Invalid email or password. Please check your credentials and try again.");
         } else {
           setError(authError.message);
@@ -40,7 +56,7 @@ export default function SignInPage() {
         return;
       }
 
-      if (data.session) {
+      if (data?.session) {
         await refreshAuth();
         router.push("/dashboard");
       }
@@ -50,152 +66,343 @@ export default function SignInPage() {
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccessMsg(null);
+
+    if (regPassword !== confirmPassword) {
+      setError("Passwords do not match. Please verify your password.");
+      return;
+    }
+
+    if (regPassword.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const res = await fetch("/api/v1/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          organizationName,
+          email: regEmail,
+          password: regPassword,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setError(data.error || "Failed to create account. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSuccessMsg("Account and organization created successfully! Signing you in...");
+
+      // Automatically sign in after registration
+      const supabase = createSupabaseBrowserClient();
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: regEmail,
+        password: regPassword,
+      });
+
+      if (!signInError && signInData?.session) {
+        await refreshAuth();
+        router.push("/dashboard");
+      } else {
+        setActiveTab("SIGN_IN");
+        setEmail(regEmail);
+        setIsSubmitting(false);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred during account creation. Please try again.");
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between antialiased selection:bg-primary/20 selection:text-primary transition-colors duration-200">
-      {/* Header */}
+      {/* Top Navigation Bar */}
       <header className="w-full border-b border-border-subtle bg-surface/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
-              <Radio className="w-5 h-5 text-primary" />
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <span className="font-extrabold text-lg text-foreground tracking-tight">G-Tech</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                Delta
-              </span>
-            </div>
+          <Link href="/" className="flex items-center group">
+            <NexaNetLogo variant="horizontal" />
           </Link>
 
           <div className="flex items-center gap-2">
             <button
               onClick={toggleTheme}
-              className="w-9 h-9 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition-colors"
+              className="w-9 h-9 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition-colors shadow-xs"
             >
               {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-primary" />}
             </button>
             <button
               onClick={enterDemoMode}
-              className="px-3.5 py-1.5 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-xs font-semibold text-foreground transition-colors"
+              className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1.5"
             >
-              Demo Mode
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Explore Demo</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Main Sign In Form */}
+      {/* Main Auth Container (Matching Uploaded Reference UI/UX) */}
       <main className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-6">
+          {/* Header Copy */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Secure Operator Portal</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-              Sign In to G-Tech OS
+              {activeTab === "SIGN_IN" ? "Sign In to Your Workspace" : "Create Your ISP Workspace"}
             </h1>
-            <p className="text-xs text-muted-foreground">
-              Access your ISP network management, subscriber billing, and NOC telemetry
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
+              {activeTab === "SIGN_IN"
+                ? "Access verified physical business radar, PPPoE fleet management, and M-Pesa billing."
+                : "Join NexaNet Technologies and manage your network, subscribers, and billing from one platform."}
             </p>
           </div>
 
-          <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-border shadow-xl space-y-5">
+          {/* Auth Surface Card */}
+          <div className="p-6 sm:p-8 rounded-2xl bg-surface border border-border shadow-xs space-y-6">
+            {/* Pill Tab Switcher */}
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-surface-subtle border border-border">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("SIGN_IN");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "SIGN_IN"
+                    ? "bg-surface text-foreground shadow-xs border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("REGISTER");
+                  setError(null);
+                  setSuccessMsg(null);
+                }}
+                className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "REGISTER"
+                    ? "bg-surface text-foreground shadow-xs border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
+            {/* Notifications */}
             {error && (
               <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold">
                 {error}
               </div>
             )}
-
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1.5 uppercase tracking-wider">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@yourisp.com"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
-                  />
-                </div>
+            {successMsg && (
+              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold">
+                {successMsg}
               </div>
+            )}
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+            {/* TAB 1: SIGN IN FORM */}
+            {activeTab === "SIGN_IN" && (
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email address"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-foreground">
+                      Password
+                    </label>
+                    <Link
+                      href="/forgot-password"
+                      className="text-xs text-primary hover:underline font-semibold"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary-hover transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <span>Authenticating...</span>
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* TAB 2: REGISTER / CREATE ACCOUNT FORM */}
+            {activeTab === "REGISTER" && (
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Full name"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    ISP / Organization Name
+                  </label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      value={organizationName}
+                      onChange={(e) => setOrganizationName(e.target.value)}
+                      placeholder="Organization name"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Work Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="Email address"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-primary hover:underline font-semibold"
-                  >
-                    Forgot Password?
-                  </Link>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showRegPassword ? "text" : "password"}
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
-                  />
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm password"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 px-4 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-sm transition flex items-center justify-center gap-2 shadow-brand-btn disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <span>Authenticating...</span>
-                ) : (
-                  <>
-                    <span>Sign In to Dashboard</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-surface px-2 text-muted-foreground font-medium">Or</span>
-              </div>
-            </div>
-
-            <button
-              onClick={enterDemoMode}
-              className="w-full py-2.5 px-4 rounded-xl bg-surface-elevated hover:bg-surface border border-border text-foreground font-bold text-xs transition flex items-center justify-center gap-2 shadow-xs"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              <span>Explore Demo Mode (No Account Needed)</span>
-            </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary-hover transition-colors shadow-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <span>Creating Workspace...</span>
+                  ) : (
+                    <>
+                      <span>Create Account</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
-
-          <p className="text-center text-xs text-muted-foreground">
-            Don&apos;t have an ISP account yet?{" "}
-            <Link href="/register" className="text-primary font-bold hover:underline">
-              Create an Account
-            </Link>
-          </p>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="py-4 border-t border-border bg-surface-subtle text-center text-xs text-muted-foreground">
-        &copy; 2025 G-Tech ISP Operating System. Carrier-Grade Network Billing.
+      <footer className="w-full py-4 border-t border-border-subtle text-center text-xs text-muted-foreground">
+        &copy; {new Date().getFullYear()} NexaNet Technologies Ltd. ISP Network &amp; Billing.
       </footer>
     </div>
   );

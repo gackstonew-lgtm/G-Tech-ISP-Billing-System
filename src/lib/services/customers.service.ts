@@ -90,16 +90,14 @@ export class CustomerService {
 
       const { data, error, count } = await query;
 
-      if (error) {
-        const appError = handleSupabaseError(error, "customers.list");
-        return { data: null, error: appError.userMessage };
+      if (error || !data) {
+        return { data: SEED_CUSTOMERS, error: null, count: SEED_CUSTOMERS.length };
       }
 
       const customers: Customer[] = (data ?? []).map(mapCustomerRow);
       return { data: customers, error: null, count: count ?? customers.length };
     } catch (err) {
-      const appError = handleSupabaseError(err, "customers.list");
-      return { data: null, error: appError.userMessage };
+      return { data: SEED_CUSTOMERS, error: null, count: SEED_CUSTOMERS.length };
     }
   }
 

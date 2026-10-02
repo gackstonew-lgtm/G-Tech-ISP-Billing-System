@@ -23,7 +23,7 @@ export default function NotFound() {
         className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>Return to Operations NOC</span>
+        <span>Return to Dashboard</span>
       </Link>
     </div>
   );

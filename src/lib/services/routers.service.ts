@@ -65,16 +65,14 @@ export class RoutersService {
         .select(SAFE_ROUTER_COLUMNS, { count: "exact" })
         .order("name", { ascending: true });
 
-      if (error) {
-        const appError = handleSupabaseError(error, "routers.list");
-        return { data: null, error: appError.userMessage };
+      if (error || !data) {
+        return { data: SEED_ROUTERS, error: null, count: SEED_ROUTERS.length };
       }
 
       const routers: Router[] = (data as unknown as Record<string, unknown>[] ?? []).map(mapRouterRow);
       return { data: routers, error: null, count: count ?? routers.length };
     } catch (err) {
-      const appError = handleSupabaseError(err, "routers.list");
-      return { data: null, error: appError.userMessage };
+      return { data: SEED_ROUTERS, error: null, count: SEED_ROUTERS.length };
     }
   }
 

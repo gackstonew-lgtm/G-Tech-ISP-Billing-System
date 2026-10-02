@@ -19,9 +19,9 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface text-foreground shadow-xl overflow-hidden transition-all duration-200",
-        elevated && "bg-surface-elevated/70",
-        hoverEffect && "hover:border-primary/50 hover:shadow-2xl hover:-translate-y-0.5",
+        "rounded-2xl border border-border bg-surface text-foreground shadow-xs overflow-hidden transition-all duration-200",
+        elevated && "bg-surface-elevated",
+        hoverEffect && "hover:border-primary/40",
         className
       )}
       {...props}
@@ -39,7 +39,7 @@ export function GlassCardHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-b border-border bg-surface-elevated/60 px-4 sm:px-6 py-3.5",
+        "flex items-center justify-between border-b border-border bg-surface-elevated/40 px-4 sm:px-6 py-3.5",
         className
       )}
       {...props}
@@ -55,7 +55,7 @@ export function GlassCardContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("p-5 sm:p-6", className)} {...props}>
+    <div className={cn("p-4 sm:p-6", className)} {...props}>
       {children}
     </div>
   );

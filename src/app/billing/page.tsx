@@ -140,7 +140,7 @@ export default function BillingPage() {
               174379
             </div>
             <div className="text-xs text-primary mt-1 font-semibold">
-              G-Tech Networks C2B Validation Active
+              NexaNet Technologies C2B Validation Active
             </div>
           </GlassCardContent>
         </GlassCard>

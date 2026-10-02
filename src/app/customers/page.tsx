@@ -55,7 +55,7 @@ export default function CustomersPage() {
     }
 
     try {
-      const res = await fetch("/api/v1/customers");
+      const res = await fetch("/api/v1/subscribers-api");
       const data = await res.json();
       if (data?.success && data.data) {
         setCustomers(data.data);
@@ -117,7 +117,7 @@ export default function CustomersPage() {
     }
 
     try {
-      const res = await fetch("/api/v1/customers", {
+      const res = await fetch("/api/v1/subscribers-api", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

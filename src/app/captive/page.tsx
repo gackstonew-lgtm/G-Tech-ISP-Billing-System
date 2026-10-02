@@ -21,6 +21,7 @@ import { MpesaService } from "@/lib/payments/mpesa";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
+import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function CaptivePortalPage() {
   const hotspotPlans = SEED_PLANS.filter((p) => p.serviceType === "HOTSPOT");
@@ -65,7 +66,7 @@ export default function CaptivePortalPage() {
     setVoucherStatus("Authenticating voucher with FreeRADIUS AAA...");
 
     setTimeout(() => {
-      setVoucherStatus("Voucher Valid! Connected to G-Tech High-Speed WiFi.");
+      setVoucherStatus("Voucher Valid! Connected to NexaNet High-Speed WiFi.");
       setIsProcessing(false);
     }, 1200);
   };
@@ -76,19 +77,7 @@ export default function CaptivePortalPage() {
       <header className="border-b border-border-subtle bg-surface/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
-              <Wifi className="w-5 h-5 text-primary group-hover:scale-105 transition-transform" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-extrabold text-base text-foreground tracking-tight">
-                  G-Tech WiFi
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                  Hotspot
-                </span>
-              </div>
-            </div>
+            <NexaNetLogo variant="horizontal" />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -103,7 +92,7 @@ export default function CaptivePortalPage() {
               href="/dashboard"
               className="text-[11px] font-bold text-foreground hover:text-primary px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-elevated transition shadow-xs"
             >
-              NOC &rarr;
+              Dashboard &rarr;
             </Link>
           </div>
         </div>
@@ -276,7 +265,7 @@ export default function CaptivePortalPage() {
 
       {/* Footer */}
       <footer className="border-t border-border bg-surface-subtle py-4 text-center text-[11px] text-muted-foreground">
-        <p>&copy; 2025 G-Tech Networks. Powered by FreeRADIUS &amp; MikroTik RouterOS.</p>
+        <p>&copy; 2026 NexaNet Technologies ISP Network &amp; Billing.</p>
       </footer>
     </div>
   );

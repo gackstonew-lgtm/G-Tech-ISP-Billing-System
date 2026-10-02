@@ -31,6 +31,7 @@ import { MpesaService } from "@/lib/payments/mpesa";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
+import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function CustomerPortalPage() {
   const customer = SEED_CUSTOMERS[0];
@@ -69,22 +70,7 @@ export default function CustomerPortalPage() {
       <header className="border-b border-border-subtle bg-surface/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-foreground group-hover:border-primary transition-all duration-200 shadow-xs">
-              <Radio className="w-5 h-5 text-primary group-hover:scale-105 transition-transform" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight">
-                  G-Tech Care
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                  Portal
-                </span>
-              </div>
-              <div className="text-[10px] text-muted-foreground font-mono">
-                Account: <span className="text-primary font-bold">{customer.accountNumber}</span>
-              </div>
-            </div>
+            <NexaNetLogo variant="horizontal" />
           </Link>
 
           <div className="flex items-center gap-3">
@@ -99,7 +85,7 @@ export default function CustomerPortalPage() {
               href="/dashboard"
               className="text-xs font-bold text-foreground hover:text-primary px-3.5 py-2 rounded-xl border border-border bg-surface hover:bg-surface-elevated transition shadow-xs"
             >
-              Operator NOC &rarr;
+              Operator Dashboard &rarr;
             </Link>
           </div>
         </div>

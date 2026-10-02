@@ -22,11 +22,11 @@ import {
 } from "@/types";
 
 export const SEED_ORGANIZATION: Organization = {
-  id: "org-gtech-kenya-01",
-  name: "G-Tech Fiber & Wireless Networks Ltd",
-  slug: "g-tech-kenya",
+  id: "org-nexanet-01",
+  name: "NexaNet Technologies Ltd",
+  slug: "nexanet-technologies",
   businessNumber: "BN-2024-9812",
-  email: "support@gtechisp.co.ke",
+  email: "support@nexanet.co.ke",
   phone: "+254712345678",
   currency: "KES",
   timezone: "Africa/Nairobi",

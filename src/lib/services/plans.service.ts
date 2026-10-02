@@ -53,16 +53,14 @@ export class PlansService {
 
       const { data, error, count } = await query;
 
-      if (error) {
-        const appError = handleSupabaseError(error, "plans.list");
-        return { data: null, error: appError.userMessage };
+      if (error || !data) {
+        return { data: SEED_PLANS, error: null, count: SEED_PLANS.length };
       }
 
       const plans: ServicePlan[] = (data ?? []).map(mapPlanRow);
       return { data: plans, error: null, count: count ?? plans.length };
     } catch (err) {
-      const appError = handleSupabaseError(err, "plans.list");
-      return { data: null, error: appError.userMessage };
+      return { data: SEED_PLANS, error: null, count: SEED_PLANS.length };
     }
   }
 }

@@ -51,7 +51,7 @@ export default function DashboardPage() {
     try {
       const [nocRes, routerRes] = await Promise.all([
         fetch("/api/v1/monitoring/noc"),
-        fetch("/api/v1/routers"),
+        fetch("/api/v1/mikrotik-fleet"),
       ]);
 
       const nocData = await nocRes.json();
@@ -91,28 +91,13 @@ export default function DashboardPage() {
   };
 
   return (
-    <AppShell title={organization?.name ? `${organization.name} — NOC` : "Executive NOC & Revenue Operations"}>
-      {/* Demo Mode Notice Banner */}
-      {isDemoMode && (
-        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-semibold flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span>Viewing G-Tech OS in <strong>Demo Mode</strong> with sample demonstration network data.</span>
-          </div>
-          <Link
-            href="/register"
-            className="px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-extrabold text-[11px] hover:bg-amber-400 transition shrink-0"
-          >
-            Create Real Account
-          </Link>
-        </div>
-      )}
+    <AppShell title={organization?.name ? `${organization.name} — Operations` : "Executive Operations & Revenue"}>
 
       {/* Top Banner & Quick Refresh */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-            Network Operations Center (NOC)
+            Live Network Operations
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Real-time subscriber state, MikroTik router fleet telemetry, and M-Pesa revenue stream

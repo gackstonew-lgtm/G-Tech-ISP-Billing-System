@@ -30,7 +30,7 @@ export default function MonitoringPage() {
   }, []);
 
   return (
-    <AppShell title="Live Network Telemetry & NOC">
+    <AppShell title="Live Network Telemetry & Monitoring">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

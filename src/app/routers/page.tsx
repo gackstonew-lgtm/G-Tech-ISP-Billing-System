@@ -43,7 +43,7 @@ export default function RoutersPage() {
     }
 
     try {
-      const res = await fetch("/api/v1/routers");
+      const res = await fetch("/api/v1/mikrotik-fleet");
       const data = await res.json();
       if (data?.success && data.data) {
         setRouters(data.data);
