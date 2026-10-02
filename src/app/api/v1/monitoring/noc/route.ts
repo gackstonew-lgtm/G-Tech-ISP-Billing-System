@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { getSeedNOCStats } from "@/lib/db/mock-db";
+import { NOCService } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const stats = getSeedNOCStats();
+  const result = await NOCService.getStats();
+
   return NextResponse.json({
     success: true,
-    data: stats,
+    data: result.data,
+    ...(result.error ? { warning: result.error } : {}),
   });
 }

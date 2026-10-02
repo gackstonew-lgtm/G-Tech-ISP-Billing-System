@@ -19,9 +19,9 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface text-foreground shadow-sm overflow-hidden transition-all duration-200",
+        "rounded-2xl border border-border bg-surface text-foreground shadow-xl overflow-hidden transition-all duration-200",
         elevated && "bg-surface-elevated/70",
-        hoverEffect && "hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5",
+        hoverEffect && "hover:border-primary/50 hover:shadow-2xl hover:-translate-y-0.5",
         className
       )}
       {...props}

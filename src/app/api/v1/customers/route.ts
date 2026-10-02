@@ -1,28 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SEED_CUSTOMERS } from "@/lib/db/mock-db";
+import { CustomerService } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const status = searchParams.get("status");
+  const status = searchParams.get("status") ?? undefined;
+  const search = searchParams.get("q") ?? undefined;
 
-  let data = SEED_CUSTOMERS;
-  if (status && status !== "ALL") {
-    data = data.filter((c) => c.status === status);
+  const result = await CustomerService.list({
+    status,
+    searchQuery: search,
+  });
+
+  if (result.error && !result.data) {
+    return NextResponse.json(
+      { success: false, error: result.error },
+      { status: 503 }
+    );
   }
 
   return NextResponse.json({
     success: true,
-    count: data.length,
-    data,
+    count: result.count ?? result.data?.length ?? 0,
+    data: result.data ?? [],
   });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { fullName, phoneNumber, email, physicalAddress, siteId } = body;
+    const { fullName, phoneNumber, email, physicalAddress, siteId, altPhoneNumber, nationalId } = body;
 
     if (!fullName || !phoneNumber) {
       return NextResponse.json(
@@ -31,32 +39,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const newCustomer = {
-      id: `cust-${Date.now()}`,
-      organizationId: "org-gtech-kenya-01",
-      accountNumber: `GT-${Math.floor(1000 + Math.random() * 9000)}`,
-      fullName,
-      phoneNumber,
-      email,
-      physicalAddress,
-      siteId: siteId || "site-01",
-      status: "ACTIVE",
-      balanceDue: 0,
-      createdAt: new Date().toISOString(),
-    };
+    const result = await CustomerService.create(
+      "org-gtech-kenya-01", // TODO: derive from authenticated session organization_id
+      { fullName, phoneNumber, email, physicalAddress, siteId, altPhoneNumber, nationalId }
+    );
+
+    if (result.error) {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: true,
-        message: "Customer provisioned successfully into FreeRADIUS & MikroTik",
-        data: newCustomer,
+        message: "Customer provisioned successfully",
+        data: result.data,
       },
       { status: 201 }
     );
   } catch (err: unknown) {
     const e = err as Error;
     return NextResponse.json(
-      { success: false, error: e.message },
+      { success: false, error: "Unable to create customer. Please try again." },
       { status: 500 }
     );
   }
