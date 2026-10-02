@@ -18,26 +18,43 @@ import Link from "next/link";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 
+const SHORTENED_TITLES: Record<string, string> = {
+  "Executive Operations & Revenue": "Operations",
+  "Operations Dashboard": "Operations",
+  "Subscribers & Customer CRM": "Subscribers",
+  "MikroTik Fleet Management": "MikroTik",
+  "Hotspot Vouchers": "Vouchers",
+  "Billing & M-Pesa": "Billing",
+  "Field Operations": "Field Ops",
+  "Live Network Telemetry & Monitoring": "Monitoring",
+  "Settings & Config": "Settings",
+  "Customer Self-Care": "Self-Care",
+  "Captive Portal": "Captive",
+};
+
 export function Navbar({ title = "Operations Dashboard" }: { title?: string }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { user, profile, isDemoMode, exitDemoMode, signOut } = useAuth();
 
+  const shortenedTitle = SHORTENED_TITLES[title] || title;
+
   return (
     <>
       <header className="sticky top-0 z-40 flex items-center justify-between h-16 sm:h-20 px-4 md:px-8 bg-surface/80 backdrop-blur-md border-b border-border-subtle transition-colors duration-200">
         {/* Left: Mobile trigger & Page Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="md:hidden w-9 h-9 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition-colors"
+            className="md:hidden w-9 h-9 shrink-0 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition-colors"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-base sm:text-lg font-extrabold text-foreground tracking-tight flex items-center gap-2">
-              {title}
+          <div className="min-w-0 truncate">
+            <h1 className="text-sm sm:text-base md:text-lg font-extrabold text-foreground tracking-tight flex items-center gap-2 truncate">
+              <span className="sm:hidden truncate">{shortenedTitle}</span>
+              <span className="hidden sm:inline truncate">{title}</span>
             </h1>
           </div>
         </div>
