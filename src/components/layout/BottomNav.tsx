@@ -57,7 +57,7 @@ export function BottomNav() {
       {/* Persistent Bottom Mobile Navigation Bar */}
       <nav
         aria-label="Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-md border-t border-border shadow-lg transition-colors duration-200"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/80 dark:bg-[#090d16]/85 backdrop-blur-xl border-t border-border shadow-[0_-8px_30px_rgba(0,0,0,0.15)] transition-all duration-200"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="flex items-center justify-around h-16 px-2 max-w-md mx-auto">
