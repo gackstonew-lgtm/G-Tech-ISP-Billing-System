@@ -13,6 +13,7 @@ import {
   cidrToMaskUint32,
   uint32ToIpv4,
 } from "@/lib/network/free-tools";
+import { SpeedometerGauge } from "./SpeedometerGauge";
 
 const CIDR_OPTIONS = Array.from({ length: 32 }, (_, idx) => {
   const prefix = idx + 1;
@@ -57,6 +58,22 @@ export function SubnetCalculatorTool() {
   };
 
   const effectiveCidr = result.valid ? result.cidr : cidrPrefix;
+
+  // Subtle network capacity/status visualization (never claims to measure internet speed)
+  let gaugeDialValue = 0;
+  let gaugePrimaryLabel = "Invalid IPv4/CIDR";
+  let gaugeSecondaryLabel = "Enter a valid IPv4 address and prefix";
+  let gaugeBadge = "INPUT REQUIRED";
+
+  if (result.valid) {
+    // Map host bit capacity (32 - cidr) and split density smoothly onto a neutral instrument range [40..180]
+    const hostBits = 32 - result.cidr;
+    const splitBits = Math.max(0, result.splitPrefix - result.cidr);
+    gaugeDialValue = Math.min(200, Math.max(35, 45 + hostBits * 5 + splitBits * 6));
+    gaugePrimaryLabel = result.cidrNotation;
+    gaugeSecondaryLabel = `${result.usableHosts.toLocaleString()} usable hosts • ${result.subnetCount.toLocaleString()} × /${result.splitPrefix}`;
+    gaugeBadge = "SUBNET READY";
+  }
 
   return (
     <div className="space-y-6">
@@ -205,157 +222,170 @@ export function SubnetCalculatorTool() {
         </div>
       </div>
 
-      {/* Validation Error or Subnet Readout */}
-      {!result.valid ? (
-        <div
-          role="alert"
-          className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{result.error}</span>
+      {/* Central Speedometer Visualization + Subnet Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="lg:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-surface-subtle border border-border">
+          <SpeedometerGauge
+            dialValue={gaugeDialValue}
+            activePulse={false}
+            primaryLabel={gaugePrimaryLabel}
+            secondaryLabel={gaugeSecondaryLabel}
+            modeBadge={gaugeBadge}
+          />
         </div>
-      ) : (
-        <div className="space-y-5">
-          {/* Primary Subnet Summary Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                Network Address
-              </div>
-              <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
-                {result.networkAddress}
-              </div>
-              <div className="text-[11px] text-primary font-bold font-mono mt-0.5">
-                {result.cidrNotation}
-              </div>
-            </div>
 
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                Broadcast Address
-              </div>
-              <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
-                {result.broadcastAddress}
-              </div>
-              <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
-                Wildcard: {result.wildcardMask}
-              </div>
+        <div className="lg:col-span-7 space-y-4">
+          {!result.valid ? (
+            <div
+              role="alert"
+              className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{result.error}</span>
             </div>
+          ) : (
+            <>
+              {/* Primary Subnet Summary Grid */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Network Address
+                  </div>
+                  <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
+                    {result.networkAddress}
+                  </div>
+                  <div className="text-[11px] text-primary font-bold font-mono mt-0.5">
+                    {result.cidrNotation}
+                  </div>
+                </div>
 
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                Subnet Mask
-              </div>
-              <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
-                {result.subnetMask}
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Prefix: /{result.cidr}
-              </div>
-            </div>
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Broadcast Address
+                  </div>
+                  <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
+                    {result.broadcastAddress}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                    Wildcard: {result.wildcardMask}
+                  </div>
+                </div>
 
-            <div className="p-4 rounded-2xl bg-primary/10 border border-primary/30">
-              <div className="text-[11px] font-bold text-primary uppercase">
-                Usable Hosts
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Subnet Mask
+                  </div>
+                  <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
+                    {result.subnetMask}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Prefix: /{result.cidr}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/30">
+                  <div className="text-[11px] font-bold text-primary uppercase">
+                    Usable Hosts
+                  </div>
+                  <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
+                    {result.usableHosts.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                    Total IPs: {result.totalAddresses.toLocaleString()}
+                  </div>
+                </div>
               </div>
-              <div className="text-base sm:text-lg font-extrabold text-foreground font-mono mt-1">
-                {result.usableHosts.toLocaleString()}
+
+              {/* Host Range & Scope Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    First Usable Host
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground font-mono mt-1">
+                    {result.firstUsableHost}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Last Usable Host
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground font-mono mt-1">
+                    {result.lastUsableHost}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                    Address Scope
+                  </div>
+                  <div className="text-xs font-extrabold text-foreground mt-1 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span className="truncate">{result.addressScope}</span>
+                  </div>
+                </div>
               </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                Total IPs: {result.totalAddresses.toLocaleString()}
-              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Child Subnet Block Split Table */}
+      {result.valid && (
+        <div className="rounded-2xl bg-surface-subtle border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-foreground">
+              <Layers className="w-3.5 h-3.5 text-primary" />
+              <span>
+                IPv4 Block Split Breakdown ({result.cidrNotation} →{" "}
+                {result.subnetCount.toLocaleString()} × /{result.splitPrefix})
+              </span>
             </div>
+            {result.subnetCount > result.childSubnets.length && (
+              <span className="text-[11px] text-muted-foreground">
+                Showing first {result.childSubnets.length} of{" "}
+                {result.subnetCount.toLocaleString()} subnets
+              </span>
+            )}
           </div>
 
-          {/* Host Range & Scope Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                First Usable Host
-              </div>
-              <div className="text-sm font-extrabold text-foreground font-mono mt-1">
-                {result.firstUsableHost}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                Last Usable Host
-              </div>
-              <div className="text-sm font-extrabold text-foreground font-mono mt-1">
-                {result.lastUsableHost}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="text-[11px] font-bold text-muted-foreground uppercase">
-                Address Scope &amp; Subnets
-              </div>
-              <div className="text-xs font-extrabold text-foreground mt-1 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>{result.addressScope}</span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                {result.subnetCount.toLocaleString()}× /{result.splitPrefix} subnet(s) in block
-              </div>
-            </div>
-          </div>
-
-          {/* Child Subnet Block Split Table */}
-          <div className="rounded-2xl bg-surface-subtle border border-border overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-extrabold text-foreground">
-                <Layers className="w-3.5 h-3.5 text-primary" />
-                <span>
-                  IPv4 Block Split Breakdown ({result.cidrNotation} →{" "}
-                  {result.subnetCount.toLocaleString()} × /{result.splitPrefix})
-                </span>
-              </div>
-              {result.subnetCount > result.childSubnets.length && (
-                <span className="text-[11px] text-muted-foreground">
-                  Showing first {result.childSubnets.length} of{" "}
-                  {result.subnetCount.toLocaleString()} subnets
-                </span>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[11px] font-bold text-muted-foreground uppercase bg-surface/50">
-                    <th className="py-2.5 px-4">Subnet Block</th>
-                    <th className="py-2.5 px-4">First Usable Host</th>
-                    <th className="py-2.5 px-4">Last Usable Host</th>
-                    <th className="py-2.5 px-4">Broadcast</th>
-                    <th className="py-2.5 px-4 text-right">Usable Hosts</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border text-[11px] font-bold text-muted-foreground uppercase bg-surface/50">
+                  <th className="py-2.5 px-4">Subnet Block</th>
+                  <th className="py-2.5 px-4">First Usable Host</th>
+                  <th className="py-2.5 px-4">Last Usable Host</th>
+                  <th className="py-2.5 px-4">Broadcast</th>
+                  <th className="py-2.5 px-4 text-right">Usable Hosts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border font-mono">
+                {result.childSubnets.map((sub, i) => (
+                  <tr
+                    key={i}
+                    className="hover:bg-surface/60 transition-colors"
+                  >
+                    <td className="py-2.5 px-4 font-bold text-primary">
+                      {sub.network}/{sub.cidr}
+                    </td>
+                    <td className="py-2.5 px-4 text-foreground">
+                      {sub.firstHost}
+                    </td>
+                    <td className="py-2.5 px-4 text-foreground">
+                      {sub.lastHost}
+                    </td>
+                    <td className="py-2.5 px-4 text-muted-foreground">
+                      {sub.broadcast}
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-bold text-foreground">
+                      {sub.usableHosts.toLocaleString()}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border font-mono">
-                  {result.childSubnets.map((sub, i) => (
-                    <tr
-                      key={i}
-                      className="hover:bg-surface/60 transition-colors"
-                    >
-                      <td className="py-2.5 px-4 font-bold text-primary">
-                        {sub.network}/{sub.cidr}
-                      </td>
-                      <td className="py-2.5 px-4 text-foreground">
-                        {sub.firstHost}
-                      </td>
-                      <td className="py-2.5 px-4 text-foreground">
-                        {sub.lastHost}
-                      </td>
-                      <td className="py-2.5 px-4 text-muted-foreground">
-                        {sub.broadcast}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-bold text-foreground">
-                        {sub.usableHosts.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

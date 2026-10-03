@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   AlertCircle,
 } from "lucide-react";
+import { SpeedometerGauge } from "./SpeedometerGauge";
 
 interface IpInfo {
   ip: string;
@@ -114,6 +115,24 @@ export function WhatIsMyIpTool() {
     }
   };
 
+  // Network status visualization state (does not fabricate speed values)
+  const gaugeDialValue = loading ? 36 : error ? 0 : info ? 80 : 0;
+  const gaugePrimaryLabel = loading
+    ? "Querying BGP..."
+    : info
+    ? info.ip
+    : "Lookup Unavailable";
+  const gaugeSecondaryLabel = loading
+    ? "Resolving egress IP & Autonomous System"
+    : info
+    ? `${info.version} Public Egress • ${info.asn !== "N/A" ? info.asn : info.isp}`
+    : "Retry IP lookup";
+  const gaugeBadge = loading
+    ? "NETWORK ACTIVITY"
+    : info
+    ? "ROUTING ONLINE"
+    : "OFFLINE";
+
   return (
     <div className="space-y-6">
       {/* Header & Refresh Action */}
@@ -160,102 +179,120 @@ export function WhatIsMyIpTool() {
         </div>
       )}
 
-      {loading && !info ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
-          <div className="md:col-span-3 h-24 rounded-2xl bg-surface-subtle border border-border" />
-          <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
-          <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
-          <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        {/* Left/Center: Speedometer Network Status Instrument */}
+        <div className="lg:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-surface-subtle border border-border">
+          <SpeedometerGauge
+            dialValue={gaugeDialValue}
+            activePulse={loading}
+            primaryLabel={gaugePrimaryLabel}
+            secondaryLabel={gaugeSecondaryLabel}
+            modeBadge={gaugeBadge}
+          />
         </div>
-      ) : info ? (
-        <div className="space-y-4">
-          {/* Primary Public IP Banner */}
-          <div className="p-5 rounded-2xl bg-surface-subtle border border-primary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Your Public Egress IP Address
+
+        {/* Right: Detailed Public IP & ASN Telemetry */}
+        <div className="lg:col-span-7 space-y-4">
+          {loading && !info ? (
+            <div className="space-y-3.5 animate-pulse">
+              <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
+                <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
+                <div className="h-24 rounded-2xl bg-surface-subtle border border-border" />
+              </div>
+            </div>
+          ) : info ? (
+            <div className="space-y-4">
+              {/* Primary Public IP Banner */}
+              <div className="p-5 rounded-2xl bg-surface-subtle border border-primary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Your Public Egress IP Address
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[10px] font-extrabold text-primary">
+                      {info.version}
+                    </span>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono break-all">
+                    {info.ip}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-foreground transition-colors self-start sm:self-center cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-500">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span>Copy IP</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Detailed Network Telemetry Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>ISP / Provider</span>
+                    <Building2 className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground">
+                    {info.isp}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Upstream transit / access provider
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>Organization &amp; ASN</span>
+                    <Network className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground font-mono">
+                    {info.asn !== "N/A" ? `${info.asn} • ${info.org}` : info.org}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    BGP routing autonomous system
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>Network Region</span>
+                    <MapPin className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="text-sm font-extrabold text-foreground">
+                    {[info.city, info.region, info.country]
+                      .filter(Boolean)
+                      .join(", ") || info.country}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Timezone: {info.timezone || "UTC"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>
+                  Resolved live at runtime. Only public routing and autonomous system metadata is displayed.
                 </span>
-                <span className="px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[10px] font-extrabold text-primary">
-                  {info.version}
-                </span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono break-all">
-                {info.ip}
               </div>
             </div>
-
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface border border-border hover:border-primary/40 text-xs font-bold text-foreground transition-colors self-start sm:self-center cursor-pointer"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-500">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>Copy IP</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Detailed Network Telemetry Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>ISP / Provider</span>
-                <Building2 className="w-4 h-4 text-primary" />
-              </div>
-              <div className="text-sm font-extrabold text-foreground">
-                {info.isp}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                Upstream transit / access provider
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>Organization &amp; ASN</span>
-                <Network className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="text-sm font-extrabold text-foreground font-mono">
-                {info.asn !== "N/A" ? `${info.asn} • ${info.org}` : info.org}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                BGP routing autonomous system
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>Network Region</span>
-                <MapPin className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="text-sm font-extrabold text-foreground">
-                {[info.city, info.region, info.country]
-                  .filter(Boolean)
-                  .join(", ") || info.country}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                Timezone: {info.timezone || "UTC"}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span>
-              Resolved live at runtime. Only public routing and autonomous system metadata is displayed.
-            </span>
-          </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

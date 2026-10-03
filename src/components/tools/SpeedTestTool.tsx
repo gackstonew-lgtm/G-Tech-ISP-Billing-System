@@ -12,6 +12,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
+import { SpeedometerGauge } from "./SpeedometerGauge";
 
 type TestPhase =
   | "IDLE"
@@ -244,6 +245,48 @@ export function SpeedTestTool() {
   const isRunning =
     phase === "PING" || phase === "DOWNLOAD" || phase === "UPLOAD";
 
+  // Map active phase & real measurement to the 0..240 speedometer dial
+  let gaugeDialValue = 0;
+  let gaugePrimaryLabel = "0.0 Mbps";
+  let gaugeSecondaryLabel = "Click Start Speed Test to measure connection";
+  let gaugeBadge = "READY";
+
+  if (phase === "PING") {
+    gaugeDialValue = 16;
+    gaugePrimaryLabel =
+      metrics.pingMs !== null ? `${metrics.pingMs} ms` : "Probing...";
+    gaugeSecondaryLabel = "Measuring round-trip latency & jitter";
+    gaugeBadge = "PING & JITTER";
+  } else if (phase === "DOWNLOAD") {
+    const dl = metrics.downloadMbps ?? 12;
+    gaugeDialValue = Math.min(240, dl);
+    gaugePrimaryLabel =
+      metrics.downloadMbps !== null ? `${metrics.downloadMbps} Mbps` : "Sampling...";
+    gaugeSecondaryLabel = "Live downstream throughput";
+    gaugeBadge = "DOWNLOAD TEST";
+  } else if (phase === "UPLOAD") {
+    const ul = metrics.uploadMbps ?? 10;
+    gaugeDialValue = Math.min(240, ul);
+    gaugePrimaryLabel =
+      metrics.uploadMbps !== null ? `${metrics.uploadMbps} Mbps` : "Sampling...";
+    gaugeSecondaryLabel = "Live upstream throughput";
+    gaugeBadge = "UPLOAD TEST";
+  } else if (phase === "COMPLETE") {
+    const finalDl = metrics.downloadMbps ?? 0;
+    gaugeDialValue = Math.min(240, finalDl);
+    gaugePrimaryLabel = `${finalDl} Mbps`;
+    gaugeSecondaryLabel =
+      metrics.uploadMbps !== null
+        ? `Download ${finalDl} Mbps • Upload ${metrics.uploadMbps} Mbps`
+        : "Measured downstream throughput";
+    gaugeBadge = "COMPLETED";
+  } else if (phase === "ERROR") {
+    gaugeDialValue = 0;
+    gaugePrimaryLabel = "Test Interrupted";
+    gaugeSecondaryLabel = "Retry when connection is ready";
+    gaugeBadge = "ERROR";
+  }
+
   return (
     <div className="space-y-6">
       {/* Header & Action Controls */}
@@ -282,144 +325,171 @@ export function SpeedTestTool() {
         </div>
       </div>
 
-      {/* Progress & Live Phase Status */}
-      <div className="space-y-2" aria-live="polite">
-        <div className="flex items-center justify-between text-xs font-semibold">
-          <span className="text-foreground flex items-center gap-2">
-            {isRunning && (
-              <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
-            )}
-            {phase === "COMPLETE" && (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            )}
-            {phase === "ERROR" && (
-              <AlertCircle className="w-4 h-4 text-red-500" />
-            )}
-            <span>{statusText}</span>
-          </span>
-          <span className="text-muted-foreground font-mono">{progress}%</span>
-        </div>
-
-        <div
-          className="w-full h-2 rounded-full bg-surface-subtle border border-border overflow-hidden"
-          role="progressbar"
-          aria-valuenow={progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Speed test progress"
-        >
-          <div
-            className="h-full bg-primary transition-all duration-300 rounded-full"
-            style={{ width: `${progress}%` }}
+      {/* Central Speedometer Visualization + Telemetry Readout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        {/* Left/Center: Live Speedometer Instrument */}
+        <div className="lg:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-surface-subtle border border-border">
+          <SpeedometerGauge
+            dialValue={gaugeDialValue}
+            activePulse={isRunning}
+            primaryLabel={gaugePrimaryLabel}
+            secondaryLabel={gaugeSecondaryLabel}
+            modeBadge={gaugeBadge}
           />
         </div>
-      </div>
 
-      {errorMsg && (
-        <div
-          role="alert"
-          className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
+        {/* Right: Progress & 4 Telemetry Cards */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Progress & Live Phase Status */}
+          <div className="space-y-2" aria-live="polite">
+            <div className="flex items-center justify-between text-xs font-semibold">
+              <span className="text-foreground flex items-center gap-2">
+                {isRunning && (
+                  <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
+                )}
+                {phase === "COMPLETE" && (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                )}
+                {phase === "ERROR" && (
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                )}
+                <span>{statusText}</span>
+              </span>
+              <span className="text-muted-foreground font-mono">{progress}%</span>
+            </div>
 
-      {/* 4 Telemetry Readout Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Download */}
-        <div
-          className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
-            phase === "DOWNLOAD"
-              ? "border-primary ring-1 ring-primary/30"
-              : "border-border"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-            <span>Download</span>
-            <ArrowDown className="w-4 h-4 text-primary" />
+            <div
+              className="w-full h-2 rounded-full bg-surface-subtle border border-border overflow-hidden"
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Speed test progress"
+            >
+              <div
+                className="h-full bg-primary transition-all duration-300 rounded-full"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-              {metrics.downloadMbps !== null ? metrics.downloadMbps : "—"}
-            </span>
-            <span className="text-xs font-bold text-muted-foreground">Mbps</span>
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            {phase === "DOWNLOAD" ? "Sampling downstream..." : "Downstream capacity"}
-          </div>
-        </div>
 
-        {/* Upload */}
-        <div
-          className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
-            phase === "UPLOAD"
-              ? "border-primary ring-1 ring-primary/30"
-              : "border-border"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-            <span>Upload</span>
-            <ArrowUp className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-              {metrics.uploadMbps !== null ? metrics.uploadMbps : "—"}
-            </span>
-            <span className="text-xs font-bold text-muted-foreground">Mbps</span>
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            {metrics.uploadNote
-              ? metrics.uploadNote
-              : phase === "UPLOAD"
-              ? "Sampling upstream..."
-              : "Upstream capacity"}
-          </div>
-        </div>
+          {errorMsg && (
+            <div
+              role="alert"
+              className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
 
-        {/* Ping */}
-        <div
-          className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
-            phase === "PING"
-              ? "border-primary ring-1 ring-primary/30"
-              : "border-border"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-            <span>Ping</span>
-            <Timer className="w-4 h-4 text-amber-500" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-              {metrics.pingMs !== null ? metrics.pingMs : "—"}
-            </span>
-            <span className="text-xs font-bold text-muted-foreground">ms</span>
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            Minimum HTTP RTT
-          </div>
-        </div>
+          {/* 4 Telemetry Readout Cards */}
+          <div className="grid grid-cols-2 gap-3.5">
+            {/* Download */}
+            <div
+              className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
+                phase === "DOWNLOAD"
+                  ? "border-primary ring-1 ring-primary/30"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                <span>Download</span>
+                <ArrowDown className="w-4 h-4 text-primary" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                  {metrics.downloadMbps !== null ? metrics.downloadMbps : "—"}
+                </span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  Mbps
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {phase === "DOWNLOAD"
+                  ? "Sampling downstream..."
+                  : "Downstream capacity"}
+              </div>
+            </div>
 
-        {/* Jitter */}
-        <div
-          className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
-            phase === "PING"
-              ? "border-primary ring-1 ring-primary/30"
-              : "border-border"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-            <span>Jitter</span>
-            <Waves className="w-4 h-4 text-primary" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-              {metrics.jitterMs !== null ? metrics.jitterMs : "—"}
-            </span>
-            <span className="text-xs font-bold text-muted-foreground">ms</span>
-          </div>
-          <div className="text-[11px] text-muted-foreground mt-1">
-            Latency variance
+            {/* Upload */}
+            <div
+              className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
+                phase === "UPLOAD"
+                  ? "border-primary ring-1 ring-primary/30"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                <span>Upload</span>
+                <ArrowUp className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                  {metrics.uploadMbps !== null ? metrics.uploadMbps : "—"}
+                </span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  Mbps
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                {metrics.uploadNote
+                  ? metrics.uploadNote
+                  : phase === "UPLOAD"
+                  ? "Sampling upstream..."
+                  : "Upstream capacity"}
+              </div>
+            </div>
+
+            {/* Ping */}
+            <div
+              className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
+                phase === "PING"
+                  ? "border-primary ring-1 ring-primary/30"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                <span>Ping</span>
+                <Timer className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                  {metrics.pingMs !== null ? metrics.pingMs : "—"}
+                </span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  ms
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                Minimum HTTP RTT
+              </div>
+            </div>
+
+            {/* Jitter */}
+            <div
+              className={`p-4 rounded-2xl bg-surface-subtle border transition-all ${
+                phase === "PING"
+                  ? "border-primary ring-1 ring-primary/30"
+                  : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                <span>Jitter</span>
+                <Waves className="w-4 h-4 text-primary" />
+              </div>
+              <div className="mt-2 flex items-baseline gap-1.5">
+                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                  {metrics.jitterMs !== null ? metrics.jitterMs : "—"}
+                </span>
+                <span className="text-xs font-bold text-muted-foreground">
+                  ms
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1">
+                Latency variance
+              </div>
+            </div>
           </div>
         </div>
       </div>

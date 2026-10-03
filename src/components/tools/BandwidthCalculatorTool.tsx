@@ -12,6 +12,7 @@ import {
   Info,
 } from "lucide-react";
 import { calculateIspBandwidth } from "@/lib/network/free-tools";
+import { SpeedometerGauge } from "./SpeedometerGauge";
 
 const DEFAULT_VALUES = {
   totalSubscribers: "500",
@@ -75,6 +76,24 @@ export function BandwidthCalculatorTool() {
     setContentionRatio(contention);
     setHeadroomPercent(headroom);
   };
+
+  // Map calculated recommended upstream onto the 0..240 speedometer dial
+  let gaugeDialValue = 0;
+  let gaugePrimaryLabel = "Invalid Input";
+  let gaugeSecondaryLabel = "Adjust capacity parameters above";
+  let gaugeBadge = "CAPACITY ESTIMATE";
+
+  if (result.valid) {
+    const rec = result.recommendedUpstreamMbps;
+    // Map 0..240 Mbps directly; above 240 Mbps use a smooth logarithmic/scaled curve up to 240 so needle responds across all ISP tiers without exceeding maximum
+    gaugeDialValue =
+      rec <= 180
+        ? rec
+        : Math.min(240, 180 + Math.log10(Math.max(1, rec / 180)) * 42);
+    gaugePrimaryLabel = `${rec.toLocaleString()} Mbps`;
+    gaugeSecondaryLabel = `${result.recommendedUpstreamGbps} Gbps • ${result.suggestedPortTier}`;
+    gaugeBadge = "RECOMMENDED UPSTREAM";
+  }
 
   return (
     <div className="space-y-6">
@@ -234,110 +253,124 @@ export function BandwidthCalculatorTool() {
         </div>
       </div>
 
-      {/* Validation Error or Calculated Results */}
-      {!result.valid ? (
-        <div
-          role="alert"
-          className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{result.error}</span>
+      {/* Central Speedometer Visualization + Capacity Readout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="lg:col-span-5 flex flex-col items-center justify-center p-4 rounded-2xl bg-surface-subtle border border-border">
+          <SpeedometerGauge
+            dialValue={gaugeDialValue}
+            activePulse={false}
+            primaryLabel={gaugePrimaryLabel}
+            secondaryLabel={gaugeSecondaryLabel}
+            modeBadge={gaugeBadge}
+          />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Output Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>Concurrent Users</span>
-                <Users className="w-4 h-4 text-primary" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-                  {result.activeConcurrentUsers.toLocaleString()}
-                </span>
-                <span className="text-xs font-bold text-muted-foreground">
-                  active
-                </span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-1">
-                ~{result.averagePerActiveUserMbps} Mbps avg / active user
-              </div>
-            </div>
 
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>Estimated Bandwidth</span>
-                <Zap className="w-4 h-4 text-amber-500" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-                  {result.sustainedDemandMbps.toLocaleString()}
-                </span>
-                <span className="text-xs font-bold text-muted-foreground">
-                  Mbps
-                </span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-1">
-                Sustained baseline demand
-              </div>
+        <div className="lg:col-span-7 space-y-4">
+          {!result.valid ? (
+            <div
+              role="alert"
+              className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs font-semibold text-red-500 flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{result.error}</span>
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>Concurrent Users</span>
+                    <Users className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                      {result.activeConcurrentUsers.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-bold text-muted-foreground">
+                      active
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    ~{result.averagePerActiveUserMbps} Mbps avg / active user
+                  </div>
+                </div>
 
-            <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
-              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
-                <span>Peak Requirement</span>
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-                  {result.peakBurstDemandMbps.toLocaleString()}
-                </span>
-                <span className="text-xs font-bold text-muted-foreground">
-                  Mbps
-                </span>
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-1">
-                +{result.headroomMbps.toLocaleString()} Mbps safety headroom
-              </div>
-            </div>
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>Estimated Bandwidth</span>
+                    <Zap className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                      {result.sustainedDemandMbps.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-bold text-muted-foreground">
+                      Mbps
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Sustained baseline demand
+                  </div>
+                </div>
 
-            <div className="p-4 rounded-2xl bg-primary/10 border border-primary/30">
-              <div className="flex items-center justify-between text-xs font-bold text-primary uppercase">
-                <span>Recommended Upstream</span>
-                <Server className="w-4 h-4 text-primary" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
-                  {result.recommendedUpstreamMbps.toLocaleString()}
-                </span>
-                <span className="text-xs font-bold text-primary">Mbps</span>
-              </div>
-              <div className="text-[11px] font-semibold text-muted-foreground mt-1">
-                {result.recommendedUpstreamGbps} Gbps • {result.suggestedPortTier}
-              </div>
-            </div>
-          </div>
+                <div className="p-4 rounded-2xl bg-surface-subtle border border-border">
+                  <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
+                    <span>Peak Requirement</span>
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                      {result.peakBurstDemandMbps.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-bold text-muted-foreground">
+                      Mbps
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    +{result.headroomMbps.toLocaleString()} Mbps safety headroom
+                  </div>
+                </div>
 
-          {/* Engineering Estimate Disclaimer */}
-          <div className="p-3.5 rounded-xl bg-surface-subtle border border-border flex items-start gap-2.5 text-[11px] text-muted-foreground">
-            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-foreground">
-                Planning Estimate Notice:
-              </span>{" "}
-              Calculated as{" "}
-              <code className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px]">
-                Active Users = Total × Concurrency%
-              </code>
-              ,{" "}
-              <code className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px]">
-                Sustained = (Active × Plan Speed) / Contention
-              </code>
-              , plus peak microburst allowance and {headroomPercent}% headroom. Actual ISP transit demand varies with streaming hours, CDN caching, and MikroTik queue burst thresholds.
-            </div>
-          </div>
+                <div className="p-4 rounded-2xl bg-primary/10 border border-primary/30">
+                  <div className="flex items-center justify-between text-xs font-bold text-primary uppercase">
+                    <span>Recommended Upstream</span>
+                    <Server className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-foreground font-mono">
+                      {result.recommendedUpstreamMbps.toLocaleString()}
+                    </span>
+                    <span className="text-xs font-bold text-primary">Mbps</span>
+                  </div>
+                  <div className="text-[11px] font-semibold text-muted-foreground mt-1">
+                    {result.recommendedUpstreamGbps} Gbps •{" "}
+                    {result.suggestedPortTier}
+                  </div>
+                </div>
+              </div>
+
+              {/* Engineering Estimate Disclaimer */}
+              <div className="p-3.5 rounded-xl bg-surface-subtle border border-border flex items-start gap-2.5 text-[11px] text-muted-foreground">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold text-foreground">
+                    Planning Estimate Notice:
+                  </span>{" "}
+                  Calculated as{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px]">
+                    Active Users = Total × Concurrency%
+                  </code>
+                  ,{" "}
+                  <code className="px-1.5 py-0.5 rounded bg-surface border border-border font-mono text-[10px]">
+                    Sustained = (Active × Plan Speed) / Contention
+                  </code>
+                  , plus peak microburst allowance and {headroomPercent}% headroom. Actual ISP transit demand varies with streaming hours, CDN caching, and MikroTik queue burst thresholds.
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
