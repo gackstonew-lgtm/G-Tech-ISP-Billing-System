@@ -256,202 +256,6 @@ const LEFT_NODES: DeviceNodeSpec[] = [
   },
 ];
 
-/**
- * Right-side node layout: shares the same visual language and structure
- * but uses distinct phase timing, subtle positional variations, and packet routes
- * so the two sides feel organically related rather than a cloned copy.
- */
-const RIGHT_NODES: DeviceNodeSpec[] = [
-  {
-    id: "r-idcard",
-    cx: 186,
-    cy: 132,
-    r: 18,
-    tone: "slate",
-    icon: "id-card",
-    pulseDuration: "3.9s",
-    pulseDelay: "0.6s",
-  },
-  {
-    id: "r-tablet",
-    cx: 268,
-    cy: 124,
-    r: 18,
-    tone: "slate",
-    icon: "tablet",
-    pulseDuration: "3.5s",
-    pulseDelay: "1.3s",
-    receiveDuration: "3.0s",
-    receiveDelay: "0.7s",
-  },
-  {
-    id: "r-home",
-    cx: 138,
-    cy: 194,
-    r: 18,
-    tone: "teal",
-    icon: "home",
-    pulseDuration: "3.7s",
-    pulseDelay: "0.4s",
-    receiveDuration: "2.9s",
-    receiveDelay: "1.5s",
-  },
-  {
-    id: "r-settings",
-    cx: 318,
-    cy: 164,
-    r: 15,
-    tone: "slate",
-    icon: "settings",
-    pulseDuration: "4.2s",
-    pulseDelay: "1.6s",
-  },
-  {
-    id: "r-wifi",
-    cx: 328,
-    cy: 224,
-    r: 18,
-    tone: "teal",
-    icon: "wifi",
-    pulseDuration: "3.3s",
-    pulseDelay: "0.9s",
-    receiveDuration: "2.7s",
-    receiveDelay: "1.1s",
-  },
-  {
-    id: "r-chat-bottom",
-    cx: 228,
-    cy: 318,
-    r: 19,
-    tone: "slate",
-    icon: "message",
-    pulseDuration: "4.0s",
-    pulseDelay: "1.4s",
-  },
-  {
-    id: "r-shield",
-    cx: 228,
-    cy: 92,
-    r: 18,
-    tone: "teal",
-    icon: "shield",
-    pulseDuration: "3.6s",
-    pulseDelay: "0.8s",
-  },
-  {
-    id: "r-users",
-    cx: 332,
-    cy: 104,
-    r: 23,
-    tone: "teal",
-    icon: "users",
-    pulseDuration: "3.8s",
-    pulseDelay: "0.5s",
-    receiveDuration: "3.2s",
-    receiveDelay: "1.9s",
-  },
-  {
-    id: "r-upload",
-    cx: 228,
-    cy: 46,
-    r: 12,
-    tone: "slate",
-    icon: "upload",
-    pulseDuration: "4.5s",
-    pulseDelay: "0.3s",
-  },
-  {
-    id: "r-laptop",
-    cx: 118,
-    cy: 146,
-    r: 20,
-    tone: "slate",
-    icon: "laptop",
-    pulseDuration: "3.4s",
-    pulseDelay: "1.1s",
-    receiveDuration: "2.8s",
-    receiveDelay: "0.3s",
-  },
-  {
-    id: "r-phone",
-    cx: 372,
-    cy: 182,
-    r: 20,
-    tone: "slate",
-    icon: "phone",
-    pulseDuration: "3.6s",
-    pulseDelay: "0.2s",
-    receiveDuration: "3.1s",
-    receiveDelay: "2.2s",
-  },
-  {
-    id: "r-broadcast",
-    cx: 82,
-    cy: 186,
-    r: 19,
-    tone: "slate",
-    icon: "broadcast",
-    pulseDuration: "4.1s",
-    pulseDelay: "1.8s",
-  },
-  {
-    id: "r-network",
-    cx: 76,
-    cy: 234,
-    r: 19,
-    tone: "slate",
-    icon: "network",
-    pulseDuration: "3.7s",
-    pulseDelay: "0.7s",
-    receiveDuration: "2.6s",
-    receiveDelay: "1.4s",
-  },
-  {
-    id: "r-message-teal",
-    cx: 130,
-    cy: 260,
-    r: 18,
-    tone: "teal",
-    icon: "message",
-    pulseDuration: "3.5s",
-    pulseDelay: "1.2s",
-  },
-  {
-    id: "r-checklist",
-    cx: 168,
-    cy: 336,
-    r: 19,
-    tone: "teal",
-    icon: "checklist",
-    pulseDuration: "3.8s",
-    pulseDelay: "1.5s",
-    receiveDuration: "3.3s",
-    receiveDelay: "0.6s",
-  },
-  {
-    id: "r-mail",
-    cx: 118,
-    cy: 344,
-    r: 20,
-    tone: "slate",
-    icon: "mail",
-    pulseDuration: "4.3s",
-    pulseDelay: "0.4s",
-  },
-  {
-    id: "r-headset",
-    cx: 344,
-    cy: 350,
-    r: 18,
-    tone: "teal",
-    icon: "headset",
-    pulseDuration: "3.6s",
-    pulseDelay: "1.7s",
-    receiveDuration: "2.9s",
-    receiveDelay: "2.0s",
-  },
-];
-
 const LEFT_JUNCTIONS: JunctionDotSpec[] = [
   { cx: 160, cy: 86, r: 4.2, tone: "teal", delay: "0.2s" },
   { cx: 162, cy: 136, r: 4.2, tone: "teal", delay: "0.8s" },
@@ -472,28 +276,6 @@ const LEFT_JUNCTIONS: JunctionDotSpec[] = [
   { cx: 162, cy: 266, r: 4.2, tone: "teal", delay: "1.2s" },
   { cx: 140, cy: 192, r: 4.2, tone: "teal", delay: "1.7s" },
   { cx: 64, cy: 222, r: 4.5, tone: "slate", delay: "0.9s" },
-];
-
-const RIGHT_JUNCTIONS: JunctionDotSpec[] = [
-  { cx: 304, cy: 86, r: 4.2, tone: "teal", delay: "0.6s" },
-  { cx: 300, cy: 136, r: 4.2, tone: "teal", delay: "1.2s" },
-  { cx: 250, cy: 118, r: 4.2, tone: "teal", delay: "0.3s" },
-  { cx: 208, cy: 120, r: 4.2, tone: "teal", delay: "1.5s" },
-  { cx: 166, cy: 84, r: 4.5, tone: "slate", delay: "0.9s" },
-  { cx: 82, cy: 124, r: 4.2, tone: "teal", delay: "1.8s" },
-  { cx: 164, cy: 168, r: 4.2, tone: "teal", delay: "0.7s" },
-  { cx: 130, cy: 226, r: 4.2, tone: "teal", delay: "0.2s" },
-  { cx: 84, cy: 274, r: 4.5, tone: "slate", delay: "1.4s" },
-  { cx: 160, cy: 248, r: 4.2, tone: "teal", delay: "1.9s" },
-  { cx: 72, cy: 324, r: 4.2, tone: "teal", delay: "0.5s" },
-  { cx: 204, cy: 322, r: 4.2, tone: "teal", delay: "1.1s" },
-  { cx: 152, cy: 374, r: 4.2, tone: "teal", delay: "0.4s" },
-  { cx: 192, cy: 382, r: 4.5, tone: "slate", delay: "1.6s" },
-  { cx: 270, cy: 384, r: 4.5, tone: "slate", delay: "0.8s" },
-  { cx: 268, cy: 296, r: 4.2, tone: "teal", delay: "1.3s" },
-  { cx: 302, cy: 266, r: 4.2, tone: "teal", delay: "0.1s" },
-  { cx: 324, cy: 192, r: 4.2, tone: "teal", delay: "1.0s" },
-  { cx: 400, cy: 222, r: 4.5, tone: "slate", delay: "1.7s" },
 ];
 
 /**
@@ -570,81 +352,6 @@ const LEFT_PACKET_ROUTES: PacketRouteSpec[] = [
     d: "M 64 222 L 134 222 L 174 218",
     duration: "2.6s",
     delay: "1.8s",
-    direction: "inbound",
-    tone: "primary",
-  },
-];
-
-const RIGHT_PACKET_ROUTES: PacketRouteSpec[] = [
-  // 1. Globe -> Top-Right Junction -> Users Community Node
-  {
-    id: "rp-users",
-    d: "M 272 174 L 300 136 L 332 104",
-    duration: "3.2s",
-    delay: "0.5s",
-    direction: "outbound",
-    tone: "teal",
-  },
-  // 2. Globe -> Inner Left -> Home CPE Node -> Broadcast Tower
-  {
-    id: "rp-home",
-    d: "M 180 202 L 138 194 L 82 186",
-    duration: "2.9s",
-    delay: "1.1s",
-    direction: "outbound",
-    tone: "teal",
-  },
-  // 3. Inbound: Laptop Workstation -> Top-Left Junction -> Globe
-  {
-    id: "rp-laptop-in",
-    d: "M 82 124 L 118 146 L 164 168 L 188 182",
-    duration: "2.8s",
-    delay: "0.2s",
-    direction: "inbound",
-    tone: "primary",
-  },
-  // 4. Globe -> Right Spoke -> Mobile Phone Node
-  {
-    id: "rp-phone",
-    d: "M 288 204 L 324 192 L 372 182",
-    duration: "3.1s",
-    delay: "1.5s",
-    direction: "outbound",
-    tone: "teal",
-  },
-  // 5. Globe -> Left Ring -> Network Switch Hierarchy
-  {
-    id: "rp-network",
-    d: "M 180 224 L 130 226 L 76 234",
-    duration: "2.6s",
-    delay: "0.8s",
-    direction: "outbound",
-    tone: "primary",
-  },
-  // 6. Globe -> Bottom-Left Ring -> Checklist / Work Order
-  {
-    id: "rp-checklist",
-    d: "M 200 264 L 204 322 L 168 336",
-    duration: "3.3s",
-    delay: "0.3s",
-    direction: "outbound",
-    tone: "teal",
-  },
-  // 7. Globe -> Bottom-Right Spoke -> Headset Support Node
-  {
-    id: "rp-headset",
-    d: "M 274 256 L 302 266 L 344 350",
-    duration: "2.9s",
-    delay: "1.4s",
-    direction: "outbound",
-    tone: "teal",
-  },
-  // 8. Inbound: WiFi Hotspot -> Globe Hub
-  {
-    id: "rp-wifi-in",
-    d: "M 400 222 L 328 224 L 288 218",
-    duration: "2.7s",
-    delay: "1.0s",
     direction: "inbound",
     tone: "primary",
   },
@@ -824,7 +531,6 @@ function WorldContinentStrip({ offsetX = 0 }: { offsetX?: number }) {
 }
 
 export function AnimatedNetworkGlobe({
-  side = "left",
   size = "lg",
   className,
 }: AnimatedNetworkGlobeProps) {
@@ -840,10 +546,9 @@ export function AnimatedNetworkGlobe({
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const isLeft = side === "left";
-  const nodes = isLeft ? LEFT_NODES : RIGHT_NODES;
-  const junctions = isLeft ? LEFT_JUNCTIONS : RIGHT_JUNCTIONS;
-  const packetRoutes = isLeft ? LEFT_PACKET_ROUTES : RIGHT_PACKET_ROUTES;
+  const nodes = LEFT_NODES;
+  const junctions = LEFT_JUNCTIONS;
+  const packetRoutes = LEFT_PACKET_ROUTES;
 
   const globeCx = 232;
   const globeCy = 214;
@@ -939,7 +644,7 @@ export function AnimatedNetworkGlobe({
             cy={globeCy}
             r="96"
             strokeDasharray="195 75 150 85"
-            transform={isLeft ? "rotate(-28 232 214)" : "rotate(142 232 214)"}
+            transform="rotate(-28 232 214)"
           />
 
           {/* Middle primary network ring (r = 132) */}
@@ -948,7 +653,7 @@ export function AnimatedNetworkGlobe({
             cy={globeCy}
             r="132"
             strokeDasharray="340 68 260 65"
-            transform={isLeft ? "rotate(15 232 214)" : "rotate(-165 232 214)"}
+            transform="rotate(15 232 214)"
           />
 
           {/* Outer partial network arc (r = 166) */}
@@ -957,59 +662,31 @@ export function AnimatedNetworkGlobe({
             cy={globeCy}
             r="166"
             strokeDasharray="180 140 160 190"
-            transform={isLeft ? "rotate(108 232 214)" : "rotate(-72 232 214)"}
+            transform="rotate(108 232 214)"
           />
 
           {/* Radial & branched network connection spokes */}
-          {isLeft ? (
-            <>
-              <line x1="192" y1="174" x2="132" y2="102" />
-              <line x1="184" y1="154" x2="160" y2="86" />
-              <line x1="214" y1="118" x2="196" y2="66" />
-              <line x1="234" y1="94" x2="234" y2="46" />
-              <line x1="256" y1="120" x2="298" y2="84" />
-              <line x1="276" y1="182" x2="344" y2="148" />
-              <line x1="344" y1="148" x2="382" y2="124" />
-              <line x1="284" y1="202" x2="382" y2="184" />
-              <line x1="284" y1="224" x2="388" y2="232" />
-              <line x1="304" y1="248" x2="380" y2="274" />
-              <line x1="292" y1="272" x2="392" y2="324" />
-              <line x1="280" y1="288" x2="344" y2="344" />
-              <line x1="264" y1="264" x2="296" y2="336" />
-              <line x1="296" y1="336" x2="312" y2="374" />
-              <line x1="260" y1="322" x2="272" y2="382" />
-              <line x1="232" y1="318" x2="232" y2="368" />
-              <line x1="206" y1="342" x2="194" y2="384" />
-              <line x1="190" y1="256" x2="118" y2="352" />
-              <line x1="168" y1="244" x2="114" y2="278" />
-              <line x1="174" y1="218" x2="64" y2="222" />
-              <line x1="176" y1="204" x2="92" y2="180" />
-            </>
-          ) : (
-            <>
-              <line x1="272" y1="174" x2="332" y2="104" />
-              <line x1="280" y1="154" x2="304" y2="86" />
-              <line x1="250" y1="118" x2="268" y2="66" />
-              <line x1="228" y1="92" x2="228" y2="46" />
-              <line x1="208" y1="120" x2="166" y2="84" />
-              <line x1="188" y1="182" x2="118" y2="146" />
-              <line x1="118" y1="146" x2="82" y2="124" />
-              <line x1="180" y1="202" x2="82" y2="186" />
-              <line x1="180" y1="224" x2="76" y2="234" />
-              <line x1="160" y1="248" x2="84" y2="274" />
-              <line x1="172" y1="272" x2="72" y2="324" />
-              <line x1="184" y1="288" x2="118" y2="344" />
-              <line x1="200" y1="264" x2="168" y2="336" />
-              <line x1="168" y1="336" x2="152" y2="374" />
-              <line x1="204" y1="322" x2="192" y2="382" />
-              <line x1="228" y1="318" x2="228" y2="368" />
-              <line x1="258" y1="342" x2="270" y2="384" />
-              <line x1="274" y1="256" x2="344" y2="350" />
-              <line x1="296" y1="244" x2="350" y2="278" />
-              <line x1="288" y1="218" x2="400" y2="222" />
-              <line x1="288" y1="204" x2="372" y2="182" />
-            </>
-          )}
+          <line x1="192" y1="174" x2="132" y2="102" />
+          <line x1="184" y1="154" x2="160" y2="86" />
+          <line x1="214" y1="118" x2="196" y2="66" />
+          <line x1="234" y1="94" x2="234" y2="46" />
+          <line x1="256" y1="120" x2="298" y2="84" />
+          <line x1="276" y1="182" x2="344" y2="148" />
+          <line x1="344" y1="148" x2="382" y2="124" />
+          <line x1="284" y1="202" x2="382" y2="184" />
+          <line x1="284" y1="224" x2="388" y2="232" />
+          <line x1="304" y1="248" x2="380" y2="274" />
+          <line x1="292" y1="272" x2="392" y2="324" />
+          <line x1="280" y1="288" x2="344" y2="344" />
+          <line x1="264" y1="264" x2="296" y2="336" />
+          <line x1="296" y1="336" x2="312" y2="374" />
+          <line x1="260" y1="322" x2="272" y2="382" />
+          <line x1="232" y1="318" x2="232" y2="368" />
+          <line x1="206" y1="342" x2="194" y2="384" />
+          <line x1="190" y1="256" x2="118" y2="352" />
+          <line x1="168" y1="244" x2="114" y2="278" />
+          <line x1="174" y1="218" x2="64" y2="222" />
+          <line x1="176" y1="204" x2="92" y2="180" />
         </g>
 
         {/* ============================================================
@@ -1027,9 +704,7 @@ export function AnimatedNetworkGlobe({
                 strokeWidth="1.75"
                 strokeLinecap="round"
                 strokeDasharray="10 120"
-                className={
-                  isLeft ? "qc-net-stream-left" : "qc-net-stream-right"
-                }
+                className="qc-net-stream-left"
                 style={{
                   animationDuration: route.duration,
                   animationDelay: route.delay,
@@ -1101,9 +776,7 @@ export function AnimatedNetworkGlobe({
             strokeOpacity="0.28"
             strokeWidth="1.2"
             strokeDasharray="6 6"
-            className={
-              isLeft ? "qc-net-orbit-slow-left" : "qc-net-orbit-slow-right"
-            }
+            className="qc-net-orbit-slow-left"
             style={{ transformOrigin: `${globeCx}px ${globeCy}px` }}
           />
 
@@ -1145,11 +818,7 @@ export function AnimatedNetworkGlobe({
             <g
               fill="#e2e8f0"
               fillOpacity="0.92"
-              className={
-                isLeft
-                  ? "qc-net-globe-pan-left"
-                  : "qc-net-globe-pan-right"
-              }
+              className="qc-net-globe-pan-left"
             >
               <g transform={`translate(${globeCx - 80}, 0)`}>
                 <WorldContinentStrip offsetX={0} />

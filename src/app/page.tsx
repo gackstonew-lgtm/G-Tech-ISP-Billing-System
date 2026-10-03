@@ -202,7 +202,7 @@ export default function HomePage() {
 
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden">
-        {/* Ambient Left & Right Network Globe Visualizations (Desktop & Tablet) */}
+        {/* Ambient Left Network Globe Visualization (Desktop & Tablet) */}
         <div
           aria-hidden="true"
           className="pointer-events-none select-none hidden md:block absolute inset-x-0 top-6 lg:top-8 z-0 max-w-[1600px] mx-auto h-[420px]"
@@ -210,12 +210,6 @@ export default function HomePage() {
           <div className="absolute top-2 md:-left-14 lg:-left-6 xl:left-2 2xl:left-8 md:opacity-75 lg:opacity-90 xl:opacity-100 transition-opacity duration-300">
             <AnimatedNetworkGlobe
               side="left"
-              className="md:w-52 md:h-52 lg:w-72 lg:h-72 xl:w-[340px] xl:h-[340px] 2xl:w-[380px] 2xl:h-[380px]"
-            />
-          </div>
-          <div className="absolute top-2 md:-right-14 lg:-right-6 xl:right-2 2xl:right-8 md:opacity-75 lg:opacity-90 xl:opacity-100 transition-opacity duration-300">
-            <AnimatedNetworkGlobe
-              side="right"
               className="md:w-52 md:h-52 lg:w-72 lg:h-72 xl:w-[340px] xl:h-[340px] 2xl:w-[380px] 2xl:h-[380px]"
             />
           </div>
@@ -280,13 +274,12 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Compact Mobile Network Visualizations */}
+            {/* Compact Mobile Network Visualization */}
             <div
               aria-hidden="true"
-              className="pointer-events-none select-none flex md:hidden items-center justify-center gap-3 pt-2"
+              className="pointer-events-none select-none flex md:hidden items-center justify-center pt-2"
             >
               <AnimatedNetworkGlobe side="left" size="sm" className="w-36 h-36 sm:w-44 sm:h-44 opacity-90" />
-              <AnimatedNetworkGlobe side="right" size="sm" className="w-36 h-36 sm:w-44 sm:h-44 opacity-90" />
             </div>
           </div>
 

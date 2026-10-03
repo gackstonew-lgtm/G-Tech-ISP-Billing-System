@@ -245,10 +245,6 @@ body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-@keyframes qc-orbit-spin-reverse {
-  0% { transform: rotate(360deg); }
-  100% { transform: rotate(0deg); }
-}
 @keyframes qc-stream-dash {
   0% { stroke-dashoffset: 130; opacity: 0.2; }
   45% { opacity: 0.85; }
@@ -272,19 +268,10 @@ body {
   animation: qc-globe-pan 32s linear infinite;
   will-change: transform;
 }
-.qc-net-globe-pan-right {
-  animation: qc-globe-pan 38s linear infinite;
-  animation-delay: -14s;
-  will-change: transform;
-}
 .qc-net-orbit-slow-left {
   animation: qc-orbit-spin 36s linear infinite;
 }
-.qc-net-orbit-slow-right {
-  animation: qc-orbit-spin-reverse 42s linear infinite;
-}
-.qc-net-stream-left,
-.qc-net-stream-right {
+.qc-net-stream-left {
   animation-name: qc-stream-dash;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   animation-iteration-count: infinite;
