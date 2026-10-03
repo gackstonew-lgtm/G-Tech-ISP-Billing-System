@@ -4,10 +4,10 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "G-Tech ISP | Billing & Network Operations",
-  description: "G-Tech ISP Network & Billing — Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS Platform.",
-  keywords: ["G-Tech ISP", "ISP Billing", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
-  authors: [{ name: "G-Tech" }],
+  title: "QC NetCore | Billing & Network Operations",
+  description: "QC NetCore Network & Billing — Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS Platform.",
+  keywords: ["QC NetCore", "ISP Billing", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
+  authors: [{ name: "QC NetCore" }],
   manifest: "/manifest.json",
   icons: {
     icon: [

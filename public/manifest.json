@@ -1,6 +1,6 @@
 {
-  "name": "G-Tech ISP Operating System",
-  "short_name": "G-Tech ISP",
+  "name": "QC NetCore",
+  "short_name": "QC NetCore",
   "description": "Modern Kenyan ISP / WISP Hotspot & PPPoE Billing SaaS",
   "start_url": "/dashboard",
   "display": "standalone",

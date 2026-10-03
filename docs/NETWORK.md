@@ -46,7 +46,7 @@ The platform supports both **MikroTik RouterOS v6.49+** (via RouterOS binary API
 
 ## 2. Zero-Touch Onboarding Script Generator
 
-When an ISP administrator registers a new router in G-Tech OS, the system generates an idempotent, copy-pasteable RouterOS `.rsc` configuration script tailored to the router's architecture.
+When an ISP administrator registers a new router in QC NetCore, the system generates an idempotent, copy-pasteable RouterOS `.rsc` configuration script tailored to the router's architecture.
 
 ### 2.1. Standard RouterOS v7 Auto-Provisioning Script Template
 

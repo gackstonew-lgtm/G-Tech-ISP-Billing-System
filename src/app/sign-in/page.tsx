@@ -166,7 +166,7 @@ export default function SignInPage() {
             <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
               {activeTab === "SIGN_IN"
                 ? "Access verified physical business radar, PPPoE fleet management, and M-Pesa billing."
-                : "Join G-Tech ISP and manage your network, subscribers, and billing from one platform."}
+                : "Join QC NetCore and manage your network, subscribers, and billing from one platform."}
             </p>
           </div>
 
@@ -404,7 +404,7 @@ export default function SignInPage() {
 
       {/* Footer */}
       <footer className="w-full py-4 border-t border-border-subtle text-center text-xs text-muted-foreground">
-        &copy; {new Date().getFullYear()} G-Tech ISP Ltd. ISP Network &amp; Billing.
+        &copy; {new Date().getFullYear()} QC NetCore. ISP Network &amp; Billing.
       </footer>
     </div>
   );

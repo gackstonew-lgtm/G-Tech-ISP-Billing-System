@@ -1,7 +1,7 @@
 # System Architecture Specification
 
 ## 1. Executive Summary & Vision
-**G-Tech ISP Operating System (G-Tech OS)** is a production-grade, multi-tenant SaaS platform engineered specifically for Internet Service Providers (ISPs), Wireless ISPs (WISPs), hotspot operators, estate/gated-community network managers, and emerging telcos in Kenya and East Africa.
+**QC NetCore** is a production-grade, multi-tenant SaaS platform engineered specifically for Internet Service Providers (ISPs), Wireless ISPs (WISPs), hotspot operators, estate/gated-community network managers, and emerging telcos in Kenya and East Africa.
 
 The platform unifies:
 - **Tenant & Customer Management (CRM)**

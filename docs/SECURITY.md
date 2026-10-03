@@ -1,7 +1,7 @@
 # Security Architecture & Hardening Guide
 
 ## 1. Threat Model & Security Posture
-The G-Tech ISP Platform controls critical telecommunications hardware, network routing tables, AAA credentials, and direct monetary flows through mobile money gateways (M-Pesa / Airtel).
+The QC NetCore Platform controls critical telecommunications hardware, network routing tables, AAA credentials, and direct monetary flows through mobile money gateways (M-Pesa / Airtel).
 
 ### 1.1. Core Security Tenets
 1. **Zero Trust Network Architecture**:

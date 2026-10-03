@@ -93,7 +93,7 @@ export default function HomePage() {
                 href="#comparison"
                 className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
-                Why G-Tech
+                Why QC NetCore
               </a>
             </nav>
 
@@ -160,7 +160,7 @@ export default function HomePage() {
               onClick={() => setMobileMenuOpen(false)}
               className="block text-xs font-semibold text-foreground py-2 border-b border-border-subtle"
             >
-              How G-Tech Works
+              How QC NetCore Works
             </a>
             <a
               href="#features"
@@ -219,7 +219,7 @@ export default function HomePage() {
 
             {/* Supporting Copy */}
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              G-Tech ISP brings subscriber management, PPPoE, hotspot billing,
+              QC NetCore brings subscriber management, PPPoE, hotspot billing,
               MikroTik fleet management, RADIUS accounting, M-Pesa payments, and live network operations
               together in one unified platform.
             </p>
@@ -322,7 +322,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* "HOW G-TECH WORKS" SECTION */}
+      {/* "HOW QC NETCORE WORKS" SECTION */}
       <section id="how-it-works" className="py-16 md:py-24 bg-surface border-y border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-3 mb-14">
@@ -331,11 +331,11 @@ export default function HomePage() {
               <span>Complete ISP Workflow</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight">
-              How G-Tech Powers Your ISP Business
+              How QC NetCore Powers Your ISP Business
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
               From physical network integration to automated M-Pesa payment collection and customer service renewal,
-              G-Tech connects every operational stage.
+              QC NetCore connects every operational stage.
             </p>
           </div>
 
@@ -438,7 +438,7 @@ export default function HomePage() {
               Bridging Network Operations &amp; Commercial Billing
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              G-Tech operates between your network infrastructure and commercial payment systems,
+              QC NetCore operates between your network infrastructure and commercial payment systems,
               ensuring zero manual provisioning bottlenecks.
             </p>
           </div>
@@ -465,7 +465,7 @@ export default function HomePage() {
 
             <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 text-center space-y-2">
               <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
-                G-Tech Operating System Core
+                QC NetCore Operating System Core
               </div>
               <p className="text-xs text-muted-foreground max-w-xl mx-auto">
                 Subscribers • Service Plans • Invoices • Active Sessions • Field Work Orders • Real-time Telemetry
@@ -539,7 +539,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* TRADITIONAL VS G-TECH COMPARISON */}
+      {/* TRADITIONAL VS QC NETCORE COMPARISON */}
       <section id="comparison" className="py-16 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-3 mb-14">
@@ -577,10 +577,10 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* G-Tech */}
+            {/* QC NetCore */}
             <div className="p-6 sm:p-8 rounded-3xl bg-surface border border-emerald-500/30 space-y-4 shadow-xs">
               <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-500">
-                G-Tech Unified Operating System
+                QC NetCore Unified Operating System
               </div>
               <ul className="space-y-3 text-xs text-foreground font-semibold">
                 <li className="flex items-center gap-2">
@@ -642,7 +642,7 @@ export default function HomePage() {
             <NexaNetLogo variant="horizontal" />
           </div>
           <div>
-            &copy; {new Date().getFullYear()} G-Tech ISP Ltd. All rights reserved. ISP Network &amp; Billing Platform.
+            &copy; {new Date().getFullYear()} QC NetCore. All rights reserved. ISP Network &amp; Billing Platform.
           </div>
           <div className="flex items-center space-x-4">
             <Link href="/sign-in" className="hover:text-foreground">Sign In</Link>

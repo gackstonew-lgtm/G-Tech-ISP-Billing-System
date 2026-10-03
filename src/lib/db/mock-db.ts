@@ -23,7 +23,7 @@ import {
 
 export const SEED_ORGANIZATION: Organization = {
   id: "org-nexanet-01",
-  name: "G-Tech ISP Ltd",
+  name: "QC NetCore",
   slug: "nexanet-technologies",
   businessNumber: "BN-2024-9812",
   email: "support@nexanet.co.ke",

@@ -1,8 +1,8 @@
-# G-Tech ISP Operating System (G-Tech OS)
+# QC NetCore — ISP Network & Billing Operating System
 > Modern Kenyan ISP / WISP Hotspot & PPPoE Billing & Network Management SaaS
 
 ## 🌟 Executive Overview
-**G-Tech OS** is a carrier-grade, multi-tenant Software-as-a-Service (SaaS) platform architected for Internet Service Providers (ISPs), Wireless ISPs (WISPs), hotspot network operators, and community fiber networks across Kenya and East Africa.
+**QC NetCore** is a carrier-grade, multi-tenant Software-as-a-Service (SaaS) platform architected for Internet Service Providers (ISPs), Wireless ISPs (WISPs), hotspot network operators, and community fiber networks across Kenya and East Africa.
 
 It integrates:
 - **MikroTik RouterOS Orchestration** (Zero-touch provisioning, WireGuard tunnels, REST/API commands).

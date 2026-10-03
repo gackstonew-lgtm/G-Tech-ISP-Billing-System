@@ -328,7 +328,7 @@ export default function VouchersPage() {
                     <div className="flex items-center justify-between border-b border-border pb-1.5">
                       <div className="flex items-center gap-1.5">
                         <Wifi className="w-3.5 h-3.5 text-primary" />
-                        <span className="text-[11px] font-bold tracking-tight">G-TECH WIFI</span>
+                        <span className="text-[11px] font-bold tracking-tight">QC NETCORE WIFI</span>
                       </div>
                       <span className="text-[10px] font-bold text-emerald-500">
                         {formatKES(v.planPrice || 10)}
@@ -346,7 +346,7 @@ export default function VouchersPage() {
 
                     <div className="border-t border-border pt-1 text-[9px] text-muted-foreground text-center leading-tight">
                       <div>Plan: {v.planName}</div>
-                      <div>SSID: <span className="font-bold text-foreground">G-Tech_FreeWiFi</span></div>
+                      <div>SSID: <span className="font-bold text-foreground">QC_NetCore_FreeWiFi</span></div>
                     </div>
                   </div>
                 ))}
