@@ -66,7 +66,7 @@ export default function CaptivePortalPage() {
     setVoucherStatus("Authenticating voucher with FreeRADIUS AAA...");
 
     setTimeout(() => {
-      setVoucherStatus("Voucher Valid! Connected to NexaNet High-Speed WiFi.");
+      setVoucherStatus("Voucher Valid! Connected to G-Tech High-Speed WiFi.");
       setIsProcessing(false);
     }, 1200);
   };
@@ -265,7 +265,7 @@ export default function CaptivePortalPage() {
 
       {/* Footer */}
       <footer className="border-t border-border bg-surface-subtle py-4 text-center text-[11px] text-muted-foreground">
-        <p>&copy; 2026 NexaNet Technologies ISP Network &amp; Billing.</p>
+        <p>&copy; 2026 G-Tech ISP Network &amp; Billing.</p>
       </footer>
     </div>
   );

@@ -126,7 +126,9 @@ export class MpesaService {
       success: true,
       resultCode: 0,
       resultDesc: cb.ResultDesc,
-      receiptNumber: receiptNumber || this.generateReceiptNumber(),
+      // Never invent a random reference: Daraja retries must map to the same
+      // transaction_reference so the UNIQUE constraint can de-duplicate them.
+      receiptNumber: receiptNumber || cb.CheckoutRequestID,
       amount,
       phoneNumber,
       transactionDate,

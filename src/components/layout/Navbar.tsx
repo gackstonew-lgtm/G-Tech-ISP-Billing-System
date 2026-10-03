@@ -1,138 +1,152 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Menu,
-  X,
-  Zap,
-  Sun,
-  Moon,
-  ArrowRight,
-  Sparkles,
-  LogIn,
-  LogOut,
-  ShieldCheck,
-} from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, X, Search, CornerDownLeft } from "lucide-react";
 import { Sidebar } from "./Sidebar";
-import Link from "next/link";
-import { useTheme } from "@/components/theme/ThemeProvider";
+import { ALL_NAV_ITEMS } from "./nav";
 import { useAuth } from "@/lib/auth/auth-context";
+import { cn } from "@/lib/utils";
 
-const SHORTENED_TITLES: Record<string, string> = {
-  "Executive Operations & Revenue": "Operations",
-  "Operations Dashboard": "Operations",
-  "Subscribers & Customer CRM": "Subscribers",
-  "MikroTik Fleet Management": "MikroTik",
-  "Hotspot Vouchers": "Vouchers",
-  "Billing & M-Pesa": "Billing",
-  "Field Operations": "Field Ops",
-  "Live Network Telemetry & Monitoring": "Monitoring",
-  "Settings & Config": "Settings",
-  "Customer Self-Care": "Self-Care",
-  "Captive Portal": "Captive",
-};
+/** Jump-to-page search. Navigates only to real routes defined in nav.ts. */
+function QuickJump() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-export function Navbar({ title = "Operations Dashboard" }: { title?: string }) {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
-  const { user, profile, isDemoMode, exitDemoMode, signOut } = useAuth();
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? ALL_NAV_ITEMS.filter((i) => `${i.label} ${i.keywords ?? ""}`.toLowerCase().includes(q)).slice(0, 6)
+    : [];
 
-  const shortenedTitle = SHORTENED_TITLES[title] || title;
+  // "/" focuses the search, like most ops consoles
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const go = (href: string) => {
+    setQuery("");
+    setOpen(false);
+    inputRef.current?.blur();
+    router.push(href);
+  };
+
+  return (
+    <div className="relative hidden w-64 sm:block">
+      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      <input
+        ref={inputRef}
+        type="search"
+        role="combobox"
+        aria-expanded={open && results.length > 0}
+        aria-controls="quickjump-list"
+        aria-label="Jump to page"
+        placeholder="Jump to page…  ( / )"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setActive(0);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((a) => Math.min(a + 1, results.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((a) => Math.max(a - 1, 0));
+          } else if (e.key === "Enter" && results[active]) {
+            go(results[active].href);
+          } else if (e.key === "Escape") {
+            setQuery("");
+            inputRef.current?.blur();
+          }
+        }}
+        className="h-9 w-full rounded-md border border-border bg-surface-subtle pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+      />
+      {open && q && (
+        <ul
+          id="quickjump-list"
+          role="listbox"
+          className="absolute left-0 right-0 top-10 z-50 overflow-hidden rounded-md border border-border bg-popover py-1 shadow-[var(--shadow-pop)]"
+        >
+          {results.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">No matching page</li>}
+          {results.map((r, i) => {
+            const Icon = r.icon;
+            return (
+              <li key={r.href} role="option" aria-selected={i === active}>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => go(r.href)}
+                  className={cn(
+                    "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm",
+                    i === active ? "bg-surface-elevated text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="flex-1">{r.label}</span>
+                  {i === active && <CornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function Navbar({ title = "Dashboard" }: { title?: string }) {
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const { isDemoMode } = useAuth();
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex items-center justify-between h-16 sm:h-20 px-4 md:px-8 bg-surface/80 backdrop-blur-md border-b border-border-subtle transition-colors duration-200">
-        {/* Left: Mobile trigger & Page Title */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-border bg-surface px-4 lg:px-6">
+        <div className="flex min-w-0 items-center gap-2">
           <button
-            onClick={() => setIsMobileOpen(true)}
-            className="md:hidden w-9 h-9 shrink-0 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition-colors"
-            aria-label="Open navigation menu"
+            onClick={() => setDrawerOpen(true)}
+            className="-ml-1 hidden h-9 w-9 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-surface-elevated md:flex lg:hidden"
+            aria-label="Open navigation"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="h-5 w-5" />
           </button>
-          <div className="min-w-0 truncate">
-            <h1 className="text-sm sm:text-base md:text-lg font-extrabold text-foreground tracking-tight flex items-center gap-2 truncate">
-              <span className="sm:hidden truncate">{shortenedTitle}</span>
-              <span className="hidden sm:inline truncate">{title}</span>
-            </h1>
-          </div>
-        </div>
-
-        {/* Right Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3.5">
-          {/* Mode Indicator Badge */}
-          {isDemoMode ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold shadow-xs">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Demo Mode</span>
-            </div>
-          ) : user ? (
-            <div className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface border border-border text-foreground text-xs font-semibold shadow-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="truncate max-w-[150px]">{profile?.full_name || user.email}</span>
-            </div>
-          ) : null}
-
-          {/* Theme Switcher Toggle */}
-          <button
-            onClick={toggleTheme}
-            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated hover:border-primary/50 transition-all duration-200 shadow-xs"
-          >
-            {theme === "dark" ? (
-              <Sun className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Moon className="w-4 h-4 text-primary" />
-            )}
-          </button>
-
-          {/* User Sign In / Sign Out or Captive Action */}
-          {isDemoMode ? (
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all duration-200 shadow-brand-btn"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </Link>
-          ) : user ? (
-            <button
-              onClick={signOut}
-              className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-surface hover:bg-surface-elevated border border-border text-foreground transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </button>
-          ) : (
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground transition-all duration-200 shadow-brand-btn"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </Link>
+          <h1 className="truncate text-sm font-semibold text-foreground sm:text-base">{title}</h1>
+          {isDemoMode && (
+            <span className="shrink-0 rounded-md border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning">
+              Demo data
+            </span>
           )}
         </div>
+        <QuickJump />
       </header>
 
-      {/* Mobile Drawer */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsMobileOpen(false)}
-          />
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-surface shadow-2xl z-10 animate-in slide-in-from-left duration-200">
-            <div className="absolute top-4 right-4 z-20">
-              <button
-                onClick={() => setIsMobileOpen(false)}
-                className="w-8 h-8 rounded-lg bg-surface-elevated border border-border text-foreground flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <Sidebar onClose={() => setIsMobileOpen(false)} />
+      {/* Tablet drawer (phones use the bottom bar instead; desktop has the persistent sidebar) */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-50 hidden md:flex lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
+          <div className="relative z-10 flex h-full shadow-[var(--shadow-pop)]">
+            <Sidebar onClose={() => setDrawerOpen(false)} />
+            <button
+              onClick={() => setDrawerOpen(false)}
+              className="absolute right-2 top-3 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-elevated"
+              aria-label="Close navigation"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}

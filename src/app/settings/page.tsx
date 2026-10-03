@@ -72,7 +72,7 @@ export default function SettingsPage() {
 
   // RADIUS State
   const [radiusHost, setRadiusHost] = useState("10.100.0.1");
-  const [radiusSecret, setRadiusSecret] = useState("NexaNetRadiusSecret2025!");
+  const [radiusSecret, setRadiusSecret] = useState("G-TechRadiusSecret2025!");
   const [showRadiusSecret, setShowRadiusSecret] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {

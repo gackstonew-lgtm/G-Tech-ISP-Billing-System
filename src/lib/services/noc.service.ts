@@ -41,7 +41,7 @@ export class NOCService {
         await Promise.allSettled([
           supabase
             .from("subscriptions")
-            .select("status", { count: "exact" })
+            .select("status, end_time", { count: "exact" })
             .in("status", ["ACTIVE", "GRACE", "SUSPENDED", "EXPIRED"]),
           supabase
             .from("routers")
@@ -54,9 +54,9 @@ export class NOCService {
             .limit(10),
           supabase
             .from("payments")
-            .select("amount")
+            .select("amount, created_at")
             .eq("status", "COMPLETED")
-            .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+            .gte("created_at", new Date(new Date(new Date().setDate(1)).setHours(0, 0, 0, 0)).toISOString()),
         ]);
 
       let totalSubscribers = 0;
@@ -69,6 +69,13 @@ export class NOCService {
         totalSubscribers = subscribersResult.value.count ?? subs.length;
         activeSubscribers = subs.filter((s) => s.status === "ACTIVE").length;
         suspendedCount = subs.filter((s) => s.status === "SUSPENDED").length;
+        const now = Date.now();
+        const in24h = now + 24 * 60 * 60 * 1000;
+        expiringIn24h = subs.filter((s) => {
+          if (s.status !== "ACTIVE") return false;
+          const end = new Date(s.end_time as string).getTime();
+          return end >= now && end <= in24h;
+        }).length;
       }
 
       let totalRouters = 0;
@@ -97,25 +104,31 @@ export class NOCService {
       }
 
       let revenueToday = 0;
+      let revenueThisMonth = 0;
       if (revenueResult.status === "fulfilled" && !revenueResult.value.error) {
-        revenueToday = (revenueResult.value.data ?? []).reduce(
-          (sum: number, p: Record<string, unknown>) => sum + Number(p.amount ?? 0),
-          0
-        );
+        const startOfToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+        for (const p of (revenueResult.value.data ?? []) as Record<string, unknown>[]) {
+          const amt = Number(p.amount ?? 0);
+          revenueThisMonth += amt;
+          if (new Date(p.created_at as string).getTime() >= startOfToday) revenueToday += amt;
+        }
       }
 
       const stats: NOCStats = {
         totalSubscribers,
         activeSubscribers,
-        onlinePppoe: Math.round(activeSubscribers * 0.6),
-        onlineHotspot: Math.round(activeSubscribers * 0.4),
+        // No live-session source (RADIUS accounting / router API) is connected here yet.
+        // Report 0 and flag it so the UI shows "not available" rather than an invented split.
+        onlinePppoe: 0,
+        onlineHotspot: 0,
+        sessionsAvailable: false,
         expiringIn24h,
         suspendedCount,
         totalRouters,
         onlineRouters,
         currentBandwidthMbps: { download: 0, upload: 0 },
         revenueToday,
-        revenueThisMonth: revenueToday,
+        revenueThisMonth,
         recentAlerts: recentAlerts.length > 0 ? recentAlerts : [],
       };
 

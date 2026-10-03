@@ -274,6 +274,8 @@ export interface NOCStats {
   activeSubscribers: number;
   onlinePppoe: number;
   onlineHotspot: number;
+  /** false when no live-session source is connected (counts above are then not real). Undefined = demo/seed data. */
+  sessionsAvailable?: boolean;
   expiringIn24h: number;
   suspendedCount: number;
   totalRouters: number;

@@ -9,6 +9,7 @@ interface GlassBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "md";
 }
 
+// Legacy name kept for existing call sites; now a compact, semantic-token chip.
 export function GlassBadge({
   children,
   variant = "neutral",
@@ -17,22 +18,22 @@ export function GlassBadge({
   ...props
 }: GlassBadgeProps) {
   const variantStyles = {
-    primary: "bg-primary/10 text-primary border-primary/20",
-    success: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    warning: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    destructive: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+    primary: "bg-info-soft text-info border-info/25",
+    success: "bg-success-soft text-success border-success/25",
+    warning: "bg-warning-soft text-warning border-warning/25",
+    destructive: "bg-danger-soft text-danger border-danger/25",
     neutral: "bg-surface-elevated text-muted-foreground border-border",
   };
 
   const sizeStyles = {
-    sm: "text-[10px] px-2 py-0.5 font-bold",
-    md: "text-xs px-3 py-1 font-semibold",
+    sm: "text-xs px-1.5 py-0.5 font-medium",
+    md: "text-xs px-2 py-1 font-medium",
   };
 
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border shadow-xs transition-colors",
+        "inline-flex items-center gap-1 rounded-md border whitespace-nowrap",
         variantStyles[variant],
         sizeStyles[size],
         className

@@ -2,150 +2,246 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* ====================================================================
+   G-TECH DESIGN TOKENS
+   One source of truth. Components consume tokens through the Tailwind
+   utilities declared in @theme below (bg-surface, text-muted-foreground,
+   border-border, ...). Avoid raw hex values in components.
+   ==================================================================== */
+
 @layer base {
-  /* NexaNet Technologies Design Tokens - Light Theme */
+  /* ---- Light (cool neutral) ---- */
   :root {
-    --background: #f8fafc;
-    --foreground: #0b0f19;
+    --background: #f4f6f8;
+    --foreground: #131820;
     --card: #ffffff;
-    --card-foreground: #0b0f19;
-    --card-inner: #f1f5f9;
+    --card-foreground: #131820;
+    --card-inner: #f1f3f6;
     --popover: #ffffff;
-    --popover-foreground: #0b0f19;
+    --popover-foreground: #131820;
+
     --surface: #ffffff;
-    --surface-elevated: #f1f5f9;
-    --surface-subtle: #f8fafc;
-    --surface-secondary: #e2e8f0;
-    --primary: #0066FF;
+    --surface-subtle: #f8f9fb;
+    --surface-elevated: #eef1f4; /* hover / muted fill */
+    --surface-secondary: #dfe4ea;
+
+    --primary: #1f5fd1;
     --primary-foreground: #ffffff;
-    --primary-hover: #0052cc;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --accent: #dc2626;
-    --accent-foreground: #ffffff;
-    --destructive: #dc2626;
-    --destructive-foreground: #ffffff;
-    --border: rgba(11, 15, 25, 0.1);
-    --border-subtle: rgba(11, 15, 25, 0.05);
-    --border-strong: rgba(11, 15, 25, 0.15);
-    --input: #ffffff;
-    --ring: rgba(0, 102, 255, 0.3);
-    --success: #059669;
+    --primary-hover: #194fb0;
+    --primary-soft: #e8f0fd;
+
+    --muted: #eef1f4;
+    --muted-foreground: #566171; /* 5.9:1 on white */
+
+    --success: #15803d;
     --success-foreground: #ffffff;
-    --radius: 0.75rem;
-    --logo-nexa: #000000;
-    --logo-tech: #000000;
-    --logo-sub: #000000;
-    --logo-blue: #0066FF;
+    --success-soft: #e6f4ec;
+    --warning: #a85b00;
+    --warning-soft: #fdf1dc;
+    --danger: #b42318;
+    --danger-soft: #fdebe9;
+    --info: #1f5fd1;
+    --info-soft: #e8f0fd;
+
+    --accent: #b42318;
+    --accent-foreground: #ffffff;
+    --destructive: #b42318;
+    --destructive-foreground: #ffffff;
+
+    --border: #dde2e8;
+    --border-subtle: #e9edf1;
+    --border-strong: #c3cbd5;
+    --input: #ffffff;
+    --ring: rgba(31, 95, 209, 0.35);
+
+    /* Spacing scale (use via the padding and gap utilities; documented for reference) */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 0.75rem;
+    --spacing-lg: 1rem;
+    --spacing-xl: 1.5rem;
+
+    --radius: 0.5rem;
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.05);
+    --shadow-pop: 0 8px 24px rgba(16, 24, 40, 0.12);
+
+    --sidebar-width: 15rem;
+    --topbar-height: 3.5rem;
+
+    --logo-nexa: #131820;
+    --logo-tech: #131820;
+    --logo-sub: #566171;
+    --logo-blue: #1f5fd1;
   }
 
-  /* NexaNet Technologies Design Tokens - Dark Theme */
+  /* ---- Dark (slate, not pure black: easier on eyes over 8h shifts) ---- */
   .dark {
-    --background: #090d16;
-    --foreground: #f8fafc;
-    --card: #0f172a;
-    --card-foreground: #f8fafc;
-    --card-inner: #1e293b;
-    --popover: #0f172a;
-    --popover-foreground: #f8fafc;
-    --surface: #0f172a;
-    --surface-elevated: #1e293b;
-    --surface-subtle: #090d16;
-    --surface-secondary: #334155;
-    --primary: #0066FF;
-    --primary-foreground: #ffffff;
-    --primary-hover: #257bff;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --accent: #ef4444;
-    --accent-foreground: #ffffff;
-    --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-subtle: rgba(255, 255, 255, 0.04);
-    --border-strong: rgba(255, 255, 255, 0.15);
-    --input: #0f172a;
-    --ring: rgba(0, 102, 255, 0.4);
-    --success: #10b981;
-    --success-foreground: #ffffff;
-    --logo-nexa: #ffffff;
-    --logo-tech: #ffffff;
-    --logo-sub: #e2e8f0;
-    --logo-blue: #0066FF;
+    --background: #0e1217;
+    --foreground: #e7eaef;
+    --card: #151a21;
+    --card-foreground: #e7eaef;
+    --card-inner: #1b212a;
+    --popover: #151a21;
+    --popover-foreground: #e7eaef;
+
+    --surface: #151a21;
+    --surface-subtle: #11161c;
+    --surface-elevated: #1c222b;
+    --surface-secondary: #2a313c;
+
+    --primary: #5b95f5;
+    --primary-foreground: #0a1220; /* dark text on bright blue */
+    --primary-hover: #7aa9f7;
+    --primary-soft: #16233b;
+
+    --muted: #1c222b;
+    --muted-foreground: #9aa4b2;
+
+    --success: #4cc38a;
+    --success-foreground: #06140d;
+    --success-soft: #11261c;
+    --warning: #e5a93d;
+    --warning-soft: #2a2110;
+    --danger: #f27470;
+    --danger-soft: #2d1514;
+    --info: #5b95f5;
+    --info-soft: #16233b;
+
+    --accent: #f27470;
+    --accent-foreground: #1a0a09;
+    --destructive: #f27470;
+    --destructive-foreground: #1a0a09;
+
+    --border: #2a313c;
+    --border-subtle: #1f2630;
+    --border-strong: #3a4350;
+    --input: #151a21;
+    --ring: rgba(91, 149, 245, 0.45);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    --logo-nexa: #e7eaef;
+    --logo-tech: #e7eaef;
+    --logo-sub: #9aa4b2;
+    --logo-blue: #5b95f5;
   }
+}
+
+/* Expose tokens as Tailwind utilities. `inline` keeps them theme-switchable. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-card-inner: var(--card-inner);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --shadow-xs: var(--shadow-card);
+  --shadow-brand-btn: var(--shadow-card);
+}
+
+/* Static theme values: tighter radii and a single type family app-wide.
+   Overriding these retunes every existing rounded-* / font-* usage at once. */
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+  --font-weight-extrabold: 700;
+  --font-weight-black: 700;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans, "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-x: hidden;
 }
 
-/* Custom Scrollbar */
+/* Numbers align in tables and metrics */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbars: thin, unobtrusive */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
-  background-color: var(--background);
+  background-color: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  border: 1px solid var(--border);
-  background-color: var(--surface-secondary);
+  background-color: var(--border-strong);
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted-foreground);
 }
 
-::-selection {
+::selection {
   background-color: var(--primary);
   color: var(--primary-foreground);
 }
 
-/* Solid Surface & Card Tokens (No Gradients, No Blue Glow) */
-.bg-surface {
-  background-color: var(--surface);
+/* Skeleton placeholder (respects reduced motion below) */
+@keyframes gt-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
-
-.bg-surface-elevated {
+.gt-skeleton {
   background-color: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  animation: gt-pulse 1.4s ease-in-out infinite;
 }
 
-.bg-surface-subtle {
-  background-color: var(--surface-subtle);
-}
-
-.bg-surface-secondary {
-  background-color: var(--surface-secondary);
-}
-
-.text-muted-foreground {
-  color: var(--muted-foreground);
-}
-
-.border-border {
-  border-color: var(--border);
-}
-
-.border-border-subtle {
-  border-color: var(--border-subtle);
-}
-
-.border-border-strong {
-  border-color: var(--border-strong);
-}
-
-/* Restrained Button Shadow - NO Glowing Blue Aura */
-.shadow-brand-btn {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Print specific styles for Hotspot Vouchers */

@@ -164,7 +164,7 @@ export default function SignInPage() {
             <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
               {activeTab === "SIGN_IN"
                 ? "Access verified physical business radar, PPPoE fleet management, and M-Pesa billing."
-                : "Join NexaNet Technologies and manage your network, subscribers, and billing from one platform."}
+                : "Join G-Tech ISP and manage your network, subscribers, and billing from one platform."}
             </p>
           </div>
 
@@ -402,7 +402,7 @@ export default function SignInPage() {
 
       {/* Footer */}
       <footer className="w-full py-4 border-t border-border-subtle text-center text-xs text-muted-foreground">
-        &copy; {new Date().getFullYear()} NexaNet Technologies Ltd. ISP Network &amp; Billing.
+        &copy; {new Date().getFullYear()} G-Tech ISP Ltd. ISP Network &amp; Billing.
       </footer>
     </div>
   );

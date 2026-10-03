@@ -120,6 +120,18 @@ export class PaymentsService {
         .single();
 
       if (error) {
+        // 23505 = unique_violation on transaction_reference: this is a replayed
+        // or retried callback. Return the original record; do not double-count.
+        if ((error as { code?: string }).code === "23505") {
+          const { data: existing } = await supabase
+            .from("payments")
+            .select()
+            .eq("transaction_reference", payload.transactionReference)
+            .maybeSingle();
+          if (existing) {
+            return { data: mapPaymentRow(existing), error: null };
+          }
+        }
         const appError = handleSupabaseError(error, "payments.create");
         return { data: null, error: appError.userMessage };
       }

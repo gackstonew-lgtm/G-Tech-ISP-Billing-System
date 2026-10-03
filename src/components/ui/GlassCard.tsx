@@ -3,6 +3,9 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 
+// Legacy name kept so every existing page inherits the new flat surface
+// without per-page edits. Visually: solid surface, 1px border, no glow.
+
 interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   elevated?: boolean;
@@ -19,9 +22,9 @@ export function GlassCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-surface text-foreground shadow-xs overflow-hidden transition-all duration-200",
+        "rounded-lg border border-border bg-surface text-foreground shadow-xs overflow-hidden",
         elevated && "bg-surface-elevated",
-        hoverEffect && "hover:border-primary/40",
+        hoverEffect && "transition-colors hover:border-border-strong",
         className
       )}
       {...props}
@@ -39,7 +42,7 @@ export function GlassCardHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-b border-border bg-surface-elevated/40 px-4 sm:px-6 py-3.5",
+        "flex items-center justify-between gap-3 border-b border-border px-4 py-2.5",
         className
       )}
       {...props}
@@ -55,7 +58,7 @@ export function GlassCardContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("p-4 sm:p-6", className)} {...props}>
+    <div className={cn("p-4", className)} {...props}>
       {children}
     </div>
   );

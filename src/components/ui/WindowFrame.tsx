@@ -12,7 +12,7 @@ interface WindowFrameProps {
 }
 
 export function WindowFrame({
-  urlPreview = "nexanet.network/operations",
+  urlPreview = "g-tech-isp-billing-system.vercel.app/operations",
   tabs,
   children,
   className,

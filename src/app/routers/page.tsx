@@ -2,40 +2,30 @@
 
 import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  Router as RouterIcon,
-  Plus,
-  Activity,
-  Terminal,
-  Copy,
-  Check,
-  RefreshCw,
-  Zap,
-  CheckCircle2,
-  AlertTriangle,
-  Server,
-  X,
-  Sparkles,
-} from "lucide-react";
+import { Router as RouterIcon, Terminal, Copy, Check, RefreshCw, X } from "lucide-react";
 import { SEED_ROUTERS, SEED_ORGANIZATION } from "@/lib/db/mock-db";
 import { Router } from "@/types";
 import { RouterScriptGenerator } from "@/lib/network/script-generator";
 import { MikroTikService } from "@/lib/network/mikrotik";
-import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
-import { GlassBadge } from "@/components/ui/GlassBadge";
 import { useAuth } from "@/lib/auth/auth-context";
+import { cn, formatShortDate } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PageHeader, btnClass } from "@/components/ui/PageHeader";
+import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
 
 export default function RoutersPage() {
-  const { isDemoMode, user, organization } = useAuth();
+  const { isDemoMode, isLoading: authLoading, user, organization } = useAuth();
 
-  const [routers, setRouters] = useState<Router[]>(SEED_ROUTERS);
+  const [routers, setRouters] = useState<Router[]>([]);
   const [selectedRouterForScript, setSelectedRouterForScript] = useState<Router | null>(null);
   const [copied, setCopied] = useState(false);
   const [testingRouterId, setTestingRouterId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { latency: number; msg: string }>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchRouters = async () => {
+    setLoadError(null);
     if (isDemoMode) {
       setRouters(SEED_ROUTERS);
       setIsLoading(false);
@@ -47,17 +37,30 @@ export default function RoutersPage() {
       const data = await res.json();
       if (data?.success && data.data) {
         setRouters(data.data);
+      } else {
+        setLoadError("Routers could not be loaded. Nothing was changed.");
       }
     } catch (err) {
       console.error("[Routers] Failed to fetch routers:", err);
+      setLoadError("Routers could not be loaded. Nothing was changed.");
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    setIsLoading(true);
     fetchRouters();
-  }, [isDemoMode, user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isDemoMode, user?.id]);
+
+  useEffect(() => {
+    if (!selectedRouterForScript) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSelectedRouterForScript(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedRouterForScript]);
 
   const handleTestConnection = async (router: Router) => {
     setTestingRouterId(router.id);
@@ -94,165 +97,161 @@ export default function RoutersPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const online = routers.filter((r) => r.status === "ONLINE").length;
+
   return (
-    <AppShell title="MikroTik Fleet & Auto-Provisioning">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-            MikroTik RouterOS Fleet
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            WireGuard encrypted tunnels, FreeRADIUS AAA integration, and Zero-Touch script generation
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            if (routers.length > 0) setSelectedRouterForScript(routers[0]);
-          }}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition shrink-0"
-        >
-          <Terminal className="w-4 h-4" />
-          <span>Generate RouterOS .rsc Script</span>
-        </button>
-      </div>
+    <AppShell title="Routers">
+      <PageHeader
+        title="Routers"
+        description={
+          isLoading
+            ? "MikroTik fleet status and provisioning."
+            : `${online} of ${routers.length} online · MikroTik fleet status and provisioning.`
+        }
+        actions={
+          <button
+            onClick={() => routers.length > 0 && setSelectedRouterForScript(routers[0])}
+            disabled={routers.length === 0}
+            className={btnClass("primary")}
+          >
+            <Terminal className="h-4 w-4" aria-hidden="true" />
+            Provisioning script
+          </button>
+        }
+      />
 
-      {/* Router Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {routers.length === 0 ? (
-          <div className="col-span-full p-8 text-center space-y-3 bg-surface border border-dashed border-border rounded-2xl">
-            <RouterIcon className="w-8 h-8 text-muted-foreground mx-auto" />
-            <div className="text-sm font-bold text-foreground">No MikroTik Routers Configured</div>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Your organization currently has no registered MikroTik routers. Click below to generate an auto-configuration script for your first device.
-            </p>
-          </div>
+      {loadError && <ErrorState title="Could not load routers" detail={loadError} onRetry={fetchRouters} />}
+
+      <section className="rounded-lg border border-border bg-surface shadow-xs">
+        {isLoading ? (
+          <TableSkeleton rows={4} cols={6} />
+        ) : routers.length === 0 ? (
+          <EmptyState
+            icon={RouterIcon}
+            title="No routers yet"
+            description="Add your first MikroTik router to monitor its status and sessions. Generate a provisioning script to connect it."
+          />
         ) : (
-          routers.map((router) => {
-            const result = testResults[router.id];
-            const isTesting = testingRouterId === router.id;
-            return (
-              <GlassCard key={router.id} hoverEffect>
-                <GlassCardHeader>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <h3 className="text-sm font-bold text-foreground truncate">{router.name}</h3>
-                  </div>
-                  <GlassBadge variant="success" size="sm">
-                    {router.status}
-                  </GlassBadge>
-                </GlassCardHeader>
-
-                <GlassCardContent className="space-y-4">
-                  <div className="space-y-1.5 text-xs font-mono">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Model:</span>
-                      <span className="text-foreground font-bold">{router.boardModel || "MikroTik CCR"}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>RouterOS:</span>
-                      <span className="text-foreground font-bold">{router.routerosVersion || "v7"}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>WireGuard Tunnel:</span>
-                      <span className="text-primary font-bold">{router.wireguardTunnelIp || router.managementIp}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>API Port:</span>
-                      <span className="text-foreground">{router.apiPort}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-surface-elevated/60 border border-border text-center font-mono">
-                    <div>
-                      <div className="text-[10px] text-muted-foreground uppercase font-sans">CPU</div>
-                      <div className="text-sm font-extrabold text-foreground">{router.cpuLoad}%</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-muted-foreground uppercase font-sans">RAM Free</div>
-                      <div className="text-sm font-extrabold text-foreground">{router.freeMemoryMb} MB</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-muted-foreground uppercase font-sans">Sessions</div>
-                      <div className="text-sm font-extrabold text-emerald-500">{router.activeSessions || 0}</div>
-                    </div>
-                  </div>
-
-                  {result && (
-                    <div
-                      className={`p-2.5 rounded-xl text-xs font-mono border ${
-                        result.latency >= 0
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                          : "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                      }`}
-                    >
-                      {result.msg} ({result.latency}ms)
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      onClick={() => handleTestConnection(router)}
-                      disabled={isTesting}
-                      className="flex-1 py-2 px-3 rounded-xl bg-surface hover:bg-surface-elevated text-foreground border border-border text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-xs disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? "animate-spin text-primary" : ""}`} />
-                      <span>{isTesting ? "Testing..." : "Test Connection"}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setSelectedRouterForScript(router)}
-                      className="py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-bold transition flex items-center gap-1"
-                    >
-                      <Terminal className="w-3.5 h-3.5" />
-                      <span>Script</span>
-                    </button>
-                  </div>
-                </GlassCardContent>
-              </GlassCard>
-            );
-          })
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[56rem] text-left text-sm">
+              <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-3 py-2 font-medium">Router</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Tunnel / IP</th>
+                  <th scope="col" className="px-3 py-2 font-medium">RouterOS</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">CPU</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Free RAM</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Sessions</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Uptime</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Last seen</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {routers.map((router) => {
+                  const result = testResults[router.id];
+                  const isTesting = testingRouterId === router.id;
+                  return (
+                    <React.Fragment key={router.id}>
+                      <tr className="hover:bg-surface-subtle">
+                        <td className="px-3 py-2">
+                          <div className="font-medium leading-5">{router.name}</div>
+                          <div className="text-xs text-muted-foreground">{router.boardModel || "MikroTik"}</div>
+                        </td>
+                        <td className="px-3 py-2"><StatusBadge status={router.status} /></td>
+                        <td className="tabular px-3 py-2 font-mono text-xs">{router.wireguardTunnelIp || router.managementIp}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{router.routerosVersion || "—"}</td>
+                        <td className={cn("tabular px-3 py-2 text-right", router.cpuLoad >= 80 && "font-medium text-danger")}>
+                          {router.cpuLoad}%
+                        </td>
+                        <td className="tabular px-3 py-2 text-right">{router.freeMemoryMb} MB</td>
+                        <td className="tabular px-3 py-2 text-right">{router.activeSessions ?? 0}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{router.uptime || "—"}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{formatShortDate(router.lastSeenAt)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              onClick={() => handleTestConnection(router)}
+                              disabled={isTesting}
+                              className={btnClass("secondary", "h-8 px-2.5")}
+                            >
+                              <RefreshCw className={cn("h-3.5 w-3.5", isTesting && "animate-spin")} aria-hidden="true" />
+                              {isTesting ? "Testing" : "Test"}
+                            </button>
+                            <button
+                              onClick={() => setSelectedRouterForScript(router)}
+                              className={btnClass("ghost", "h-8 px-2.5")}
+                              aria-label={`Provisioning script for ${router.name}`}
+                            >
+                              <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
+                              Script
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {result && (
+                        <tr>
+                          <td colSpan={10} className="px-3 pb-2">
+                            <div
+                              role="status"
+                              className={cn(
+                                "rounded-md border px-3 py-1.5 text-xs",
+                                result.latency >= 0
+                                  ? "border-success/30 bg-success-soft text-success"
+                                  : "border-danger/30 bg-danger-soft text-danger"
+                              )}
+                            >
+                              {result.msg}
+                              {result.latency >= 0 ? ` · ${result.latency} ms` : ""}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* Script Generator Modal */}
       {selectedRouterForScript && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-2xl bg-surface border border-border rounded-2xl p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-primary" />
-                <div>
-                  <h3 className="text-base font-bold text-foreground">
-                    RouterOS Auto-Configuration Script
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Copy &amp; paste into MikroTik Terminal for instant zero-touch setup ({selectedRouterForScript.name})
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="script-title"
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-t-xl border border-border bg-surface shadow-[var(--shadow-pop)] sm:rounded-lg"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
+              <div>
+                <h3 id="script-title" className="text-base font-semibold">RouterOS provisioning script</h3>
+                <p className="text-sm text-muted-foreground">
+                  Paste into the MikroTik terminal for {selectedRouterForScript.name}.
+                </p>
               </div>
               <button
                 onClick={() => setSelectedRouterForScript(null)}
-                className="w-8 h-8 rounded-lg bg-surface-elevated text-foreground flex items-center justify-center hover:bg-surface border border-border"
+                aria-label="Close"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-elevated"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="relative flex-1 min-h-[250px] bg-slate-950 rounded-xl p-4 overflow-auto font-mono text-xs text-emerald-400 border border-slate-800">
+            <div className="min-h-[14rem] flex-1 overflow-auto bg-surface-subtle p-4 font-mono text-xs leading-5 text-foreground">
               <pre className="whitespace-pre-wrap">{activeScript}</pre>
             </div>
 
-            <div className="flex items-center justify-between pt-2 shrink-0">
+            <div className="flex shrink-0 flex-col gap-2 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-muted-foreground">
-                Configures WireGuard management tunnel, FreeRADIUS Client, and M-Pesa Walled Garden.
+                Configures the WireGuard management tunnel, RADIUS client and M-Pesa walled garden.
               </span>
-              <button
-                onClick={handleCopyScript}
-                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold flex items-center gap-1.5 shadow-brand-btn transition"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? "Copied to Clipboard!" : "Copy Script"}</span>
+              <button onClick={handleCopyScript} className={btnClass("primary")}>
+                {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+                {copied ? "Copied" : "Copy script"}
               </button>
             </div>
           </div>

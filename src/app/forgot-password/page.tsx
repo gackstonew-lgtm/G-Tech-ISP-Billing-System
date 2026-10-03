@@ -129,7 +129,7 @@ export default function ForgotPasswordPage() {
       </main>
 
       <footer className="py-4 border-t border-border bg-surface-subtle text-center text-xs text-muted-foreground">
-        &copy; 2026 NexaNet Technologies ISP Network &amp; Billing.
+        &copy; 2026 G-Tech ISP Network &amp; Billing.
       </footer>
     </div>
   );

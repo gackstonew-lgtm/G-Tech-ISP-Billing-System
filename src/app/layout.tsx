@@ -4,10 +4,10 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NexaNet Technologies | ISP Network & Billing",
-  description: "NexaNet Technologies ISP Network & Billing — Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS Platform.",
-  keywords: ["NexaNet Technologies", "ISP Billing", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
-  authors: [{ name: "NexaNet Technologies" }],
+  title: "G-Tech ISP | Billing & Network Operations",
+  description: "G-Tech ISP Network & Billing — Carrier-Grade MikroTik, FreeRADIUS & M-Pesa SaaS Platform.",
+  keywords: ["G-Tech ISP", "ISP Billing", "MikroTik Hotspot", "PPPoE Billing", "M-Pesa STK Push", "FreeRADIUS SaaS"],
+  authors: [{ name: "G-Tech" }],
   manifest: "/manifest.json",
   icons: {
     icon: "/logo.svg",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0066FF",
+  themeColor: "#1f5fd1",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -36,7 +36,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <script

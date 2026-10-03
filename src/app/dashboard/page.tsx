@@ -1,45 +1,154 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { AppShell } from "@/components/layout/AppShell";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Users,
   Wifi,
-  Router as RouterIcon,
   CreditCard,
-  ArrowUpRight,
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
   Clock,
-  TrendingUp,
+  PauseCircle,
+  Router as RouterIcon,
   RefreshCw,
-  Ticket,
-  Plus,
-  Sparkles,
+  UserPlus,
+  CheckCircle2,
+  ChevronRight,
+  Banknote,
+  Bell,
 } from "lucide-react";
-import {
-  getSeedNOCStats,
-  SEED_PAYMENTS,
-  SEED_ROUTERS,
-} from "@/lib/db/mock-db";
-import { NOCStats, Router, Payment } from "@/types";
-import { formatKES, formatShortDate } from "@/lib/utils";
-import Link from "next/link";
-import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
-import { GlassBadge } from "@/components/ui/GlassBadge";
+import { AppShell } from "@/components/layout/AppShell";
+import { getSeedNOCStats, SEED_PAYMENTS, SEED_ROUTERS } from "@/lib/db/mock-db";
+import type { NOCStats, Router, Payment } from "@/types";
+import { cn, formatKES, formatShortDate } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-context";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PageHeader, btnClass } from "@/components/ui/PageHeader";
+import { EmptyState, ErrorState, Skeleton } from "@/components/ui/States";
+
+// ---------- helpers ----------
+
+function timeAgo(iso?: string): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(diff)) return "—";
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.floor(h / 24);
+  return `${d} d ago`;
+}
+
+type Period = 7 | 30;
+
+/** Sum COMPLETED payments per local calendar day for the last N days. */
+function collectedByDay(payments: Payment[], days: Period) {
+  const buckets: { key: string; label: string; total: number }[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    buckets.push({
+      key: d.toDateString(),
+      label: d.toLocaleDateString("en-KE", { day: "numeric", month: "short" }),
+      total: 0,
+    });
+  }
+  const index = new Map(buckets.map((b) => [b.key, b]));
+  for (const p of payments) {
+    if (p.status !== "COMPLETED") continue;
+    const when = new Date(p.processedAt ?? p.createdAt);
+    when.setHours(0, 0, 0, 0);
+    const b = index.get(when.toDateString());
+    if (b) b.total += p.amount;
+  }
+  return buckets;
+}
+
+// ---------- small building blocks ----------
+
+function Metric({
+  label,
+  value,
+  context,
+  href,
+  icon: Icon,
+  tone = "neutral",
+}: {
+  label: string;
+  value: React.ReactNode;
+  context?: React.ReactNode;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone?: "neutral" | "warning" | "danger";
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col rounded-lg border border-border bg-surface p-3 shadow-xs transition-colors hover:border-border-strong"
+    >
+      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+        <span>{label}</span>
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </div>
+      <div
+        className={cn(
+          "tabular mt-1 text-xl font-semibold leading-7 tracking-tight",
+          tone === "warning" && "text-warning",
+          tone === "danger" && "text-danger",
+          tone === "neutral" && "text-foreground"
+        )}
+      >
+        {value}
+      </div>
+      {context && <div className="mt-0.5 text-xs text-muted-foreground">{context}</div>}
+    </Link>
+  );
+}
+
+function Panel({
+  title,
+  action,
+  children,
+  className,
+}: {
+  title: string;
+  action?: { href: string; label: string };
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("rounded-lg border border-border bg-surface shadow-xs", className)}>
+      <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {action && (
+          <Link href={action.href} className="text-xs font-medium text-primary hover:underline">
+            {action.label}
+          </Link>
+        )}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+// ---------- page ----------
 
 export default function DashboardPage() {
-  const { isDemoMode, organization, user } = useAuth();
+  const { isDemoMode, isLoading: authLoading, organization, user } = useAuth();
 
-  const [stats, setStats] = useState<NOCStats>(getSeedNOCStats());
-  const [routers, setRouters] = useState<Router[]>(SEED_ROUTERS);
-  const [payments, setPayments] = useState<Payment[]>(SEED_PAYMENTS);
+  const [stats, setStats] = useState<NOCStats | null>(null);
+  const [routers, setRouters] = useState<Router[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<Period>(7);
 
-  const fetchDashboardData = async () => {
+  const load = useCallback(async () => {
+    setError(null);
     if (isDemoMode) {
       setStats(getSeedNOCStats());
       setRouters(SEED_ROUTERS);
@@ -47,384 +156,390 @@ export default function DashboardPage() {
       setIsLoading(false);
       return;
     }
-
     try {
-      const [nocRes, routerRes] = await Promise.all([
+      const [nocRes, routerRes, payRes] = await Promise.all([
         fetch("/api/v1/monitoring/noc"),
         fetch("/api/v1/mikrotik-fleet"),
+        fetch("/api/v1/payments?limit=500"),
       ]);
+      const [noc, fleet, pay] = await Promise.all([nocRes.json(), routerRes.json(), payRes.json()]);
 
-      const nocData = await nocRes.json();
-      const routerData = await routerRes.json();
-
-      if (nocData?.success && nocData.data) {
-        setStats(nocData.data);
-      }
-      if (routerData?.success && routerData.data) {
-        setRouters(routerData.data);
-      }
-      setPayments([]); // Real user payment ledger loaded from database
+      if (noc?.success && noc.data) setStats(noc.data);
+      else throw new Error("Operations statistics are unavailable.");
+      setRouters(fleet?.success ? fleet.data : []);
+      setPayments(pay?.success ? pay.data : []);
     } catch (err) {
-      console.error("[Dashboard] Failed to fetch real metrics:", err);
+      console.error("[Dashboard] load failed:", err);
+      setError("Some dashboard data could not be loaded. Nothing was changed.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isDemoMode]);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, [isDemoMode, user?.id]);
+    if (authLoading) return;
+    setIsLoading(true);
+    load();
+  }, [authLoading, load, user?.id]);
 
-  const handleRefresh = async () => {
+  const refresh = async () => {
     setIsRefreshing(true);
-    await fetchDashboardData();
-    if (isDemoMode) {
-      setStats((prev) => ({
-        ...prev,
-        currentBandwidthMbps: {
-          download: +(280 + Math.random() * 20).toFixed(1),
-          upload: +(115 + Math.random() * 10).toFixed(1),
-        },
-      }));
-    }
+    await load();
     setIsRefreshing(false);
   };
 
-  return (
-    <AppShell title={organization?.name ? `${organization.name} — Operations` : "Executive Operations & Revenue"}>
+  // ----- derived (all from loaded data) -----
+  const failedPayments = payments.filter((p) => p.status === "FAILED").length;
+  const pendingPayments = payments.filter((p) => p.status === "PENDING" || p.status === "INITIATED").length;
+  const offlineRouters = stats ? Math.max(stats.totalRouters - stats.onlineRouters, 0) : 0;
+  const openAlerts = stats?.recentAlerts.filter((a) => !a.isResolved) ?? [];
+  const criticalAlerts = openAlerts.filter((a) => a.severity === "CRITICAL").length;
 
-      {/* Top Banner & Quick Refresh */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-            Live Network Operations
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time subscriber state, MikroTik router fleet telemetry, and M-Pesa revenue stream
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-elevated text-foreground text-xs font-semibold border border-border shadow-xs transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-primary" : ""}`} />
-            <span>{isRefreshing ? "Syncing..." : "Sync Network"}</span>
+  const attention = useMemo(() => {
+    if (!stats) return [];
+    const items: { key: string; text: string; href: string; tone: "warning" | "danger" }[] = [];
+    if (stats.expiringIn24h > 0)
+      items.push({ key: "exp", text: `${stats.expiringIn24h} subscription${stats.expiringIn24h > 1 ? "s" : ""} expire within 24 hours`, href: "/customers", tone: "warning" });
+    if (failedPayments > 0)
+      items.push({ key: "fail", text: `${failedPayments} failed payment${failedPayments > 1 ? "s" : ""}`, href: "/billing", tone: "danger" });
+    if (pendingPayments > 0)
+      items.push({ key: "pend", text: `${pendingPayments} pending M-Pesa transaction${pendingPayments > 1 ? "s" : ""}`, href: "/billing", tone: "warning" });
+    if (offlineRouters > 0)
+      items.push({ key: "rtr", text: `${offlineRouters} router${offlineRouters > 1 ? "s" : ""} offline`, href: "/routers", tone: "danger" });
+    if (criticalAlerts > 0)
+      items.push({ key: "alert", text: `${criticalAlerts} critical network alert${criticalAlerts > 1 ? "s" : ""}`, href: "/monitoring", tone: "danger" });
+    if (stats.suspendedCount > 0)
+      items.push({ key: "susp", text: `${stats.suspendedCount} suspended subscriber${stats.suspendedCount > 1 ? "s" : ""}`, href: "/customers", tone: "warning" });
+    return items;
+  }, [stats, failedPayments, pendingPayments, offlineRouters, criticalAlerts]);
+
+  const activity = useMemo(() => {
+    const rows: { key: string; when: string; title: string; detail: string; tone: "success" | "danger" | "warning" | "info" }[] = [];
+    for (const p of payments.slice(0, 8)) {
+      const who = p.senderName || p.customerName || p.msisdnPhone;
+      rows.push({
+        key: `p-${p.id}`,
+        when: p.processedAt ?? p.createdAt,
+        title: p.status === "COMPLETED" ? "Payment received" : p.status === "FAILED" ? "Payment failed" : "Payment pending",
+        detail: `${formatKES(p.amount)} from ${who} · ${p.transactionReference}`,
+        tone: p.status === "COMPLETED" ? "success" : p.status === "FAILED" ? "danger" : "warning",
+      });
+    }
+    for (const a of stats?.recentAlerts.slice(0, 5) ?? []) {
+      rows.push({
+        key: `a-${a.id}`,
+        when: a.createdAt,
+        title: a.title,
+        detail: a.message,
+        tone: a.severity === "CRITICAL" ? "danger" : a.severity === "WARNING" ? "warning" : "info",
+      });
+    }
+    return rows.sort((x, y) => new Date(y.when).getTime() - new Date(x.when).getTime()).slice(0, 8);
+  }, [payments, stats]);
+
+  const buckets = useMemo(() => collectedByDay(payments, period), [payments, period]);
+  const periodTotal = buckets.reduce((s, b) => s + b.total, 0);
+  const maxBucket = Math.max(...buckets.map((b) => b.total), 1);
+
+  const today = new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  const header = (
+    <PageHeader
+      title={organization?.name ? `${organization.name}` : "Operations overview"}
+      description={`Operations overview · ${today}`}
+      actions={
+        <>
+          <button onClick={refresh} disabled={isRefreshing} className={btnClass("secondary")}>
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
+            {isRefreshing ? "Refreshing" : "Refresh"}
           </button>
-          <Link
-            href="/vouchers"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
-          >
-            <Ticket className="w-3.5 h-3.5" />
-            <span>Generate Vouchers</span>
+          <Link href="/customers" className={btnClass("primary")}>
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            Add subscriber
           </Link>
-        </div>
-      </div>
+        </>
+      }
+    />
+  );
 
-      {/* 4 Primary Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Revenue Today */}
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Revenue (Today)
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center">
-                <CreditCard className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-foreground">
-                {formatKES(stats.revenueToday)}
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-500 font-semibold">
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>{formatKES(stats.revenueThisMonth)} this month</span>
-              </div>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        {/* Card 2: Active Subscribers */}
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Active Subscribers
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-                <Users className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-foreground">
-                {stats.activeSubscribers}{" "}
-                <span className="text-xs font-normal text-muted-foreground">
-                  / {stats.totalSubscribers} total
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-500 font-semibold">
-                <Clock className="w-3.5 h-3.5" />
-                <span>{stats.expiringIn24h} expiring in 24h</span>
-              </div>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        {/* Card 3: Online Sessions */}
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Active Online Sessions
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-                <Wifi className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-foreground">
-                {stats.onlinePppoe + stats.onlineHotspot}
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground font-semibold">
-                <span className="text-primary">{stats.onlinePppoe} PPPoE</span>
-                <span>&bull;</span>
-                <span className="text-emerald-500">{stats.onlineHotspot} Hotspot</span>
-              </div>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        {/* Card 4: Bandwidth */}
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Live Bandwidth
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-                <Activity className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-extrabold text-foreground flex items-center gap-1.5">
-                <span>{stats.currentBandwidthMbps.download}</span>
-                <span className="text-xs font-semibold text-muted-foreground">Mbps (Rx)</span>
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-xs text-primary font-semibold">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                <span>{stats.currentBandwidthMbps.upload} Mbps (Tx)</span>
-                <span className="text-muted-foreground">&bull; {stats.onlineRouters} Routers</span>
-              </div>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-      </div>
-
-      {/* Network Health & Incident Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Fleet Status (2 Cols) */}
-        <div className="lg:col-span-2">
-          <GlassCard>
-            <GlassCardHeader>
-              <div className="flex items-center gap-2">
-                <RouterIcon className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-bold text-foreground tracking-tight">
-                  MikroTik Fleet &amp; WireGuard Health
-                </h3>
-              </div>
-              <Link
-                href="/routers"
-                className="text-xs font-bold text-primary hover:text-primary-hover transition"
-              >
-                Manage Fleet &rarr;
-              </Link>
-            </GlassCardHeader>
-
-            <GlassCardContent className="space-y-3">
-              {routers.length === 0 ? (
-                <div className="p-8 text-center space-y-3 bg-surface-elevated/30 rounded-xl border border-dashed border-border">
-                  <RouterIcon className="w-8 h-8 text-muted-foreground mx-auto" />
-                  <div className="text-xs font-bold text-foreground">No MikroTik Routers Provisioned</div>
-                  <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
-                    Add your core MikroTik router to start monitoring sessions, queue rates, and WireGuard tunnels.
-                  </p>
-                  <Link
-                    href="/routers"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-brand-btn"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add First Router</span>
-                  </Link>
+  // ----- loading skeleton matching final layout -----
+  if (isLoading || !stats) {
+    return (
+      <AppShell title="Dashboard">
+        {header}
+        {error && !stats ? (
+          <ErrorState title="Dashboard could not be loaded" detail={error} onRetry={refresh} />
+        ) : (
+          <div role="status" aria-label="Loading dashboard" className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-border bg-surface p-3">
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-6 w-2/3" />
+                  <Skeleton className="h-3 w-3/4" />
                 </div>
-              ) : (
-                routers.map((router) => (
-                  <div
-                    key={router.id}
-                    className="p-3.5 rounded-xl bg-surface-elevated/50 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/50 transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
-                      <div>
-                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
-                          {router.name}
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface border border-border text-muted-foreground font-mono">
-                            {router.boardModel || "MikroTik"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground font-mono">
-                          Site: <span className="text-foreground">{router.siteName || "Core POP"}</span> &bull; Tunnel:{" "}
-                          <span className="text-primary font-semibold">{router.wireguardTunnelIp || router.managementIp}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-xs font-mono">
-                      <div>
-                        <div className="text-muted-foreground text-[10px] uppercase font-sans">CPU</div>
-                        <div className="font-bold text-foreground">{router.cpuLoad}%</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground text-[10px] uppercase font-sans">RAM Free</div>
-                        <div className="font-bold text-foreground">{router.freeMemoryMb} MB</div>
-                      </div>
-                      <div>
-                        <div className="text-muted-foreground text-[10px] uppercase font-sans">Sessions</div>
-                        <div className="font-bold text-emerald-500">{router.activeSessions || 0} online</div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </GlassCardContent>
-          </GlassCard>
-        </div>
-
-        {/* Network Alerts & Audits (1 Col) */}
-        <div>
-          <GlassCard>
-            <GlassCardHeader>
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-bold text-foreground tracking-tight">
-                  Network Alerts &amp; Audits
-                </h3>
-              </div>
-              <GlassBadge variant="neutral" size="sm">
-                Live Feed
-              </GlassBadge>
-            </GlassCardHeader>
-
-            <GlassCardContent className="space-y-3">
-              {stats.recentAlerts.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground bg-surface-elevated/30 rounded-xl border border-dashed border-border">
-                  No active network alerts. Network operational.
-                </div>
-              ) : (
-                stats.recentAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="p-3 rounded-xl bg-surface-elevated/40 border border-border space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <GlassBadge
-                        variant={alert.severity === "WARNING" ? "warning" : "primary"}
-                        size="sm"
-                      >
-                        {alert.severity}
-                      </GlassBadge>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {formatShortDate(alert.createdAt)}
-                      </span>
-                    </div>
-                    <div className="text-xs font-bold text-foreground">{alert.title}</div>
-                    <div className="text-[11px] text-muted-foreground leading-snug">{alert.message}</div>
-                  </div>
-                ))
-              )}
-            </GlassCardContent>
-          </GlassCard>
-        </div>
-      </div>
-
-      {/* Recent M-Pesa Transactions Stream */}
-      <GlassCard>
-        <GlassCardHeader>
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-emerald-500" />
-            <h3 className="text-sm font-bold text-foreground tracking-tight">
-              Real-Time M-Pesa &amp; Mobile Money Transactions
-            </h3>
+              ))}
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Skeleton className="h-64 lg:col-span-2" />
+              <Skeleton className="h-64" />
+            </div>
           </div>
-          <Link
-            href="/billing"
-            className="text-xs font-bold text-primary hover:text-primary-hover transition"
-          >
-            View All Ledgers &rarr;
-          </Link>
-        </GlassCardHeader>
+        )}
+      </AppShell>
+    );
+  }
 
-        <div className="overflow-x-auto">
-          {payments.length === 0 ? (
-            <div className="p-8 text-center space-y-2 bg-surface-elevated/30">
-              <CreditCard className="w-6 h-6 text-muted-foreground mx-auto" />
-              <div className="text-xs font-bold text-foreground">No Payment Transactions Recorded Yet</div>
-              <p className="text-[11px] text-muted-foreground">
-                Incoming Lipa Na M-Pesa C2B and STK push payments will be reconciled and listed here automatically.
-              </p>
+  const sessionsKnown = stats.sessionsAvailable !== false;
+
+  return (
+    <AppShell title="Dashboard">
+      {header}
+      {error && <ErrorState title="Some data is out of date" detail={error} onRetry={refresh} />}
+
+      {/* Key metrics: each answers a question and links to where you act on it */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Metric
+          label="Active subscribers"
+          icon={Users}
+          href="/customers"
+          value={stats.activeSubscribers.toLocaleString("en-KE")}
+          context={`of ${stats.totalSubscribers.toLocaleString("en-KE")} total`}
+        />
+        <Metric
+          label="Online now"
+          icon={Wifi}
+          href="/monitoring"
+          value={sessionsKnown ? (stats.onlinePppoe + stats.onlineHotspot).toLocaleString("en-KE") : "—"}
+          context={
+            sessionsKnown
+              ? `${stats.onlinePppoe} PPPoE · ${stats.onlineHotspot} hotspot`
+              : "Live sessions not connected"
+          }
+        />
+        <Metric
+          label="Collected today"
+          icon={CreditCard}
+          href="/billing"
+          value={formatKES(stats.revenueToday)}
+          context="Completed payments"
+        />
+        <Metric
+          label="Collected this month"
+          icon={Banknote}
+          href="/billing"
+          value={formatKES(stats.revenueThisMonth)}
+          context="Month to date"
+        />
+        <Metric
+          label="Expiring in 24 h"
+          icon={Clock}
+          href="/customers"
+          value={stats.expiringIn24h}
+          tone={stats.expiringIn24h > 0 ? "warning" : "neutral"}
+          context="Active subscriptions"
+        />
+        <Metric
+          label="Suspended"
+          icon={PauseCircle}
+          href="/customers"
+          value={stats.suspendedCount}
+          tone={stats.suspendedCount > 0 ? "danger" : "neutral"}
+          context="Service cut off"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          {/* Revenue */}
+          <Panel title="Collected revenue" action={{ href: "/billing", label: "View payments" }}>
+            <div className="p-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="tabular text-xl font-semibold tracking-tight">{formatKES(periodTotal)}</div>
+                  <div className="text-xs text-muted-foreground">Completed payments, last {period} days</div>
+                </div>
+                <div role="group" aria-label="Period" className="inline-flex rounded-md border border-border p-0.5">
+                  {([7, 30] as Period[]).map((p) => (
+                    <button
+                      key={p}
+                      aria-pressed={period === p}
+                      onClick={() => setPeriod(p)}
+                      className={cn(
+                        "h-7 rounded px-2.5 text-xs font-medium transition-colors",
+                        period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {p} days
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {periodTotal === 0 ? (
+                <EmptyState
+                  icon={CreditCard}
+                  title="No completed payments in this period"
+                  description="Payments confirmed through M-Pesa will appear here as they are reconciled."
+                  className="py-8"
+                />
+              ) : (
+                <div className="mt-4">
+                  <div className="flex h-36 items-end gap-px" role="img" aria-label={`Daily collected revenue, last ${period} days`}>
+                    {buckets.map((b) => (
+                      <div key={b.key} className="group relative flex h-full flex-1 items-end">
+                        <div
+                          className={cn("w-full rounded-t-sm", b.total > 0 ? "bg-primary" : "bg-surface-elevated")}
+                          style={{ height: `${Math.max((b.total / maxBucket) * 100, b.total > 0 ? 3 : 1)}%` }}
+                          title={`${b.label}: ${formatKES(b.total)}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                    <span>{buckets[0].label}</span>
+                    <span>{buckets[buckets.length - 1].label}</span>
+                  </div>
+                  {payments.length >= 500 && (
+                    <p className="mt-2 text-xs text-muted-foreground">Based on the latest 500 payments.</p>
+                  )}
+                </div>
+              )}
             </div>
-          ) : (
-            <table className="w-full text-left text-xs text-foreground">
-              <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
-                <tr>
-                  <th className="py-3 px-4">Receipt / Ref</th>
-                  <th className="py-3 px-4">Customer / Phone</th>
-                  <th className="py-3 px-4">Channel</th>
-                  <th className="py-3 px-4">Amount</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4">Processed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-surface-elevated/40 transition">
-                    <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                      {payment.transactionReference}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-foreground">
-                        {payment.senderName || payment.customerName || "Hotspot Guest"}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground font-mono">
-                        {payment.msisdnPhone}
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-muted-foreground text-[10px] font-mono">
-                        {payment.paymentMethod}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-extrabold text-emerald-500">
-                      {formatKES(payment.amount)}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <GlassBadge variant="success" size="sm">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>{payment.status}</span>
-                      </GlassBadge>
-                    </td>
-                    <td className="py-3.5 px-4 text-muted-foreground font-mono">
-                      {formatShortDate(payment.processedAt)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          </Panel>
+
+          {/* Network health */}
+          <Panel title="Network health" action={{ href: "/routers", label: "All routers" }}>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted-foreground">
+              <span>
+                Routers online{" "}
+                <strong className={cn("tabular font-semibold", offlineRouters > 0 ? "text-danger" : "text-foreground")}>
+                  {stats.onlineRouters}/{stats.totalRouters}
+                </strong>
+              </span>
+              <span>
+                Open alerts <strong className="tabular font-semibold text-foreground">{openAlerts.length}</strong>
+              </span>
+              {sessionsKnown && stats.currentBandwidthMbps.download > 0 && (
+                <span>
+                  Throughput{" "}
+                  <strong className="tabular font-semibold text-foreground">
+                    ↓ {stats.currentBandwidthMbps.download} / ↑ {stats.currentBandwidthMbps.upload} Mbps
+                  </strong>
+                </span>
+              )}
+            </div>
+            {routers.length === 0 ? (
+              <EmptyState
+                icon={RouterIcon}
+                title="No routers added yet"
+                description="Add your core MikroTik router to monitor its status, sessions and tunnels."
+                action={
+                  <Link href="/routers" className={btnClass("primary")}>
+                    Add router
+                  </Link>
+                }
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[34rem] text-left text-sm">
+                  <thead className="text-xs text-muted-foreground">
+                    <tr className="border-b border-border">
+                      <th scope="col" className="px-4 py-2 font-medium">Router</th>
+                      <th scope="col" className="px-2 py-2 font-medium">Status</th>
+                      <th scope="col" className="px-2 py-2 font-medium">Management IP</th>
+                      <th scope="col" className="px-2 py-2 text-right font-medium">CPU</th>
+                      <th scope="col" className="px-2 py-2 font-medium">Uptime</th>
+                      <th scope="col" className="px-4 py-2 font-medium">Last seen</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle">
+                    {routers.map((r) => (
+                      <tr key={r.id} className="hover:bg-surface-subtle">
+                        <td className="px-4 py-2">
+                          <div className="font-medium">{r.name}</div>
+                          <div className="text-xs text-muted-foreground">{r.siteName || r.boardModel}</div>
+                        </td>
+                        <td className="px-2 py-2"><StatusBadge status={r.status} /></td>
+                        <td className="tabular px-2 py-2 font-mono text-xs">{r.wireguardTunnelIp || r.managementIp}</td>
+                        <td className="tabular px-2 py-2 text-right">{r.cpuLoad}%</td>
+                        <td className="px-2 py-2 text-muted-foreground">{r.uptime || "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{timeAgo(r.lastSeenAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
         </div>
-      </GlassCard>
+
+        <div className="space-y-4">
+          {/* Needs attention */}
+          <Panel title="Needs attention">
+            {attention.length === 0 ? (
+              <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+                Nothing needs action right now.
+              </div>
+            ) : (
+              <ul className="divide-y divide-border-subtle">
+                {attention.map((item) => (
+                  <li key={item.key}>
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-surface-subtle"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn("h-2 w-2 shrink-0 rounded-full", item.tone === "danger" ? "bg-danger" : "bg-warning")}
+                      />
+                      <span className="flex-1">{item.text}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+
+          {/* Recent activity */}
+          <Panel title="Recent activity">
+            {activity.length === 0 ? (
+              <EmptyState
+                icon={Bell}
+                title="No activity yet"
+                description="Payments and network events will appear here."
+                className="py-8"
+              />
+            ) : (
+              <ul className="divide-y divide-border-subtle">
+                {activity.map((a) => (
+                  <li key={a.key} className="flex gap-3 px-4 py-2.5">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                        a.tone === "success" && "bg-success",
+                        a.tone === "danger" && "bg-danger",
+                        a.tone === "warning" && "bg-warning",
+                        a.tone === "info" && "bg-info"
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium leading-5">{a.title}</div>
+                      <div className="truncate text-xs text-muted-foreground">{a.detail}</div>
+                    </div>
+                    <time className="shrink-0 text-xs text-muted-foreground" title={formatShortDate(a.when)}>
+                      {timeAgo(a.when)}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        </div>
+      </div>
     </AppShell>
   );
 }

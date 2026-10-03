@@ -1,323 +1,460 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
-import {
-  CreditCard,
-  Plus,
-  Search,
-  CheckCircle2,
-  Clock,
-  Send,
-  Zap,
-  DollarSign,
-  TrendingUp,
-  Receipt,
-  FileText,
-  X,
-} from "lucide-react";
-import {
-  SEED_PAYMENTS,
-  SEED_CUSTOMERS,
-  SEED_ORGANIZATION,
-} from "@/lib/db/mock-db";
+import { CreditCard, Search, Send, Zap, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { SEED_PAYMENTS, SEED_ORGANIZATION } from "@/lib/db/mock-db";
 import { Payment } from "@/types";
 import { MpesaService } from "@/lib/payments/mpesa";
-import { formatKES, formatShortDate } from "@/lib/utils";
-import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
-import { GlassBadge } from "@/components/ui/GlassBadge";
+import { cn, formatKES, formatShortDate } from "@/lib/utils";
+import { useAuth } from "@/lib/auth/auth-context";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PageHeader, btnClass } from "@/components/ui/PageHeader";
+import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
+
+const PAGE_SIZE = 25;
+
+const METHOD_LABEL: Record<Payment["paymentMethod"], string> = {
+  MPESA_EXPRESS: "M-Pesa STK",
+  MPESA_C2B: "M-Pesa Paybill",
+  AIRTEL_MONEY: "Airtel Money",
+  CASH: "Cash",
+  BANK_TRANSFER: "Bank transfer",
+};
+
+type Filter = "ALL" | "COMPLETED" | "PENDING" | "FAILED";
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "COMPLETED", label: "Successful" },
+  { value: "PENDING", label: "Pending" },
+  { value: "FAILED", label: "Failed" },
+];
+
+const inputClass =
+  "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none";
 
 export default function BillingPage() {
-  const [payments, setPayments] = useState<Payment[]>(SEED_PAYMENTS);
+  const { isDemoMode, isLoading: authLoading, user } = useAuth();
+
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [page, setPage] = useState(1);
   const [isStkModalOpen, setIsStkModalOpen] = useState(false);
 
-  // STK Form State
-  const [phone, setPhone] = useState("0799112233");
-  const [amount, setAmount] = useState(2500);
-  const [accRef, setAccRef] = useState("GT-8921");
-  const [stkStatus, setStkStatus] = useState<string | null>(null);
+  // STK Form State (no pre-filled customer data)
+  const [phone, setPhone] = useState("");
+  const [amount, setAmount] = useState<number | "">("");
+  const [accRef, setAccRef] = useState("");
+  const [stkMessage, setStkMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  const filteredPayments = payments.filter((p) => {
-    return (
-      p.transactionReference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.msisdnPhone.includes(searchTerm) ||
-      (p.senderName && p.senderName.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+  const loadPayments = async () => {
+    setLoadError(null);
+    if (isDemoMode) {
+      setPayments(SEED_PAYMENTS);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/v1/payments?limit=500");
+      const data = await res.json();
+      if (data?.success) setPayments(data.data ?? []);
+      else setLoadError("Payments could not be loaded. Nothing was changed.");
+    } catch (err) {
+      console.error("[Billing] Failed to load payments:", err);
+      setLoadError("Payments could not be loaded. Nothing was changed.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+    setIsLoading(true);
+    loadPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isDemoMode, user?.id]);
+
+  useEffect(() => setPage(1), [searchTerm, filter]);
+
+  const bucket = (p: Payment): Filter =>
+    p.status === "COMPLETED" ? "COMPLETED" : p.status === "FAILED" ? "FAILED" : p.status === "REVERSED" ? "ALL" : "PENDING";
+
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = { ALL: payments.length, COMPLETED: 0, PENDING: 0, FAILED: 0 };
+    for (const p of payments) {
+      const b = bucket(p);
+      if (b !== "ALL") c[b] += 1;
+    }
+    return c;
+  }, [payments]);
+
+  const filtered = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return payments.filter((p) => {
+      const matches =
+        p.transactionReference.toLowerCase().includes(term) ||
+        p.msisdnPhone.includes(searchTerm) ||
+        (p.senderName?.toLowerCase().includes(term) ?? false) ||
+        (p.customerName?.toLowerCase().includes(term) ?? false);
+      return matches && (filter === "ALL" || bucket(p) === filter);
+    });
+  }, [payments, searchTerm, filter]);
 
   const totalCollected = payments.reduce((acc, p) => acc + (p.status === "COMPLETED" ? p.amount : 0), 0);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const closeStk = () => {
+    setIsStkModalOpen(false);
+    setStkMessage(null);
+  };
 
   const handleSendSTK = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!amount || amount <= 0) {
+      setStkMessage({ tone: "error", text: "Enter an amount greater than zero." });
+      return;
+    }
     setIsSending(true);
-    setStkStatus(null);
+    setStkMessage(null);
 
-    const res = await MpesaService.initiateSTKPush({
-      phoneNumber: phone,
-      amount,
-      accountReference: accRef,
-      transactionDesc: `Internet Subscription ${accRef}`,
-    });
-
-    setIsSending(false);
-    if (res.success) {
-      setStkStatus("STK Prompt sent! Simulating instant customer PIN entry...");
-
-      // Simulate webhook delivery after 1.5 seconds
-      setTimeout(() => {
-        const receipt = MpesaService.generateReceiptNumber();
-        const newPayment: Payment = {
-          id: `pay-${Date.now()}`,
-          organizationId: SEED_ORGANIZATION.id,
-          accountNumber: accRef,
-          customerName: "John Kamau Mwangi",
-          paymentMethod: "MPESA_EXPRESS",
-          amount,
-          currency: "KES",
-          transactionReference: receipt,
-          msisdnPhone: MpesaService.formatPhoneNumber(phone),
-          senderName: "JOHN KAMAU",
-          status: "COMPLETED",
-          processedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        };
-
-        setPayments([newPayment, ...payments]);
-        setStkStatus(`Payment Confirmed! Receipt: ${receipt}. FreeRADIUS account unblocked.`);
+    // Demo dataset keeps the original local simulation.
+    if (isDemoMode) {
+      const res = await MpesaService.initiateSTKPush({
+        phoneNumber: phone,
+        amount,
+        accountReference: accRef,
+        transactionDesc: `Internet Subscription ${accRef}`,
+      });
+      setIsSending(false);
+      if (res.success) {
+        setStkMessage({ tone: "ok", text: "Demo: prompt sent. A sample payment will be added in a moment." });
         setTimeout(() => {
-          setIsStkModalOpen(false);
-          setStkStatus(null);
-        }, 2200);
-      }, 1500);
+          const receipt = MpesaService.generateReceiptNumber();
+          const newPayment: Payment = {
+            id: `pay-${Date.now()}`,
+            organizationId: SEED_ORGANIZATION.id,
+            accountNumber: accRef,
+            paymentMethod: "MPESA_EXPRESS",
+            amount,
+            currency: "KES",
+            transactionReference: receipt,
+            msisdnPhone: MpesaService.formatPhoneNumber(phone),
+            status: "COMPLETED",
+            processedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+          };
+          setPayments((prev) => [newPayment, ...prev]);
+          closeStk();
+        }, 1500);
+      }
+      return;
+    }
+
+    // Real account: use the established API route; never fabricate a payment row.
+    // The payment appears in the ledger only when the M-Pesa callback confirms it.
+    try {
+      const res = await fetch("/api/v1/mpesa-stk-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: phone, amount, accountReference: accRef }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setStkMessage({
+          tone: "ok",
+          text: "Request sent. The payment will appear in the ledger once M-Pesa confirms it.",
+        });
+      } else {
+        setStkMessage({ tone: "error", text: data?.error || "The request was not sent. No charge was made." });
+      }
+    } catch {
+      setStkMessage({ tone: "error", text: "The request was not sent. No charge was made. Check your connection and try again." });
+    } finally {
+      setIsSending(false);
     }
   };
 
   return (
-    <AppShell title="Billing, Invoicing & M-Pesa Ledgers">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-            Financial &amp; Payment Gateway Operations
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Safaricom Daraja STK Push, C2B Paybill ledger reconciliation, and automated subscriber unblocking
-          </p>
-        </div>
-        <button
-          onClick={() => setIsStkModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
-        >
-          <Zap className="w-4 h-4" />
-          <span>Trigger M-Pesa STK Push</span>
-        </button>
+    <AppShell title="Payments">
+      <PageHeader
+        title="Payments"
+        description="M-Pesa and other collections. Payments are confirmed by the provider callback."
+        actions={
+          <button onClick={() => setIsStkModalOpen(true)} className={btnClass("primary")}>
+            <Zap className="h-4 w-4" aria-hidden="true" />
+            Request M-Pesa payment
+          </button>
+        }
+      />
+
+      {loadError && <ErrorState title="Could not load payments" detail={loadError} onRetry={loadPayments} />}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: "Collected", value: formatKES(totalCollected), ctx: "Successful payments loaded" },
+          { label: "Successful", value: counts.COMPLETED, ctx: "Transactions" },
+          { label: "Pending", value: counts.PENDING, ctx: "Awaiting confirmation", tone: counts.PENDING > 0 ? "text-warning" : "" },
+          { label: "Failed", value: counts.FAILED, ctx: "Not completed", tone: counts.FAILED > 0 ? "text-danger" : "" },
+        ].map((m) => (
+          <div key={m.label} className="rounded-lg border border-border bg-surface p-3 shadow-xs">
+            <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
+            <div className={cn("tabular mt-1 text-xl font-semibold tracking-tight", m.tone)}>{isLoading ? "—" : m.value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{m.ctx}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Financial Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-              Total Reconciled Collections
-            </div>
-            <div className="text-2xl font-extrabold text-emerald-500 mt-2">
-              {formatKES(totalCollected)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>100% Daraja Hash Verified</span>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-              Active Paybill / Till Number
-            </div>
-            <div className="text-2xl font-extrabold text-foreground font-mono mt-2">
-              174379
-            </div>
-            <div className="text-xs text-primary mt-1 font-semibold">
-              NexaNet Technologies C2B Validation Active
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        <GlassCard hoverEffect>
-          <GlassCardContent className="p-5">
-            <div className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">
-              Average Renewal Speed
-            </div>
-            <div className="text-2xl font-extrabold text-primary mt-2">
-              1.8 seconds
-            </div>
-            <div className="text-xs text-muted-foreground mt-1 font-semibold">
-              M-Pesa IPN &rarr; RADIUS CoA Disconnect
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-      </div>
-
-      {/* Search Bar */}
-      <div className="flex items-center justify-between p-4 rounded-2xl bg-surface border border-border shadow-xs">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search receipt (e.g. RKF...), phone, name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface-elevated border border-border text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:border-primary"
-          />
-        </div>
-        <div className="text-xs text-muted-foreground">
-          Showing <span className="font-bold text-foreground">{filteredPayments.length}</span> transactions
-        </div>
-      </div>
-
-      {/* Ledger Table */}
-      <GlassCard>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-foreground">
-            <thead className="border-b border-border text-[11px] uppercase text-muted-foreground font-bold bg-surface-elevated/50">
-              <tr>
-                <th className="py-3 px-4">Receipt Number</th>
-                <th className="py-3 px-4">Customer Account</th>
-                <th className="py-3 px-4">Sender Phone</th>
-                <th className="py-3 px-4">Method</th>
-                <th className="py-3 px-4">Amount</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Processed At</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredPayments.map((pay) => (
-                <tr key={pay.id} className="hover:bg-surface-elevated/40 transition">
-                  <td className="py-3.5 px-4 font-mono font-bold text-primary">
-                    {pay.transactionReference}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-foreground">
-                      {pay.customerName || pay.senderName || "Hotspot Guest"}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground font-mono">
-                      {pay.accountNumber || "Direct C2B"}
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-4 font-mono text-foreground">
-                    {pay.msisdnPhone}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-muted-foreground text-[10px] font-mono">
-                      {pay.paymentMethod}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-extrabold text-emerald-500">
-                    {formatKES(pay.amount)}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <GlassBadge variant="success" size="sm">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>{pay.status}</span>
-                    </GlassBadge>
-                  </td>
-                  <td className="py-3.5 px-4 text-muted-foreground font-mono">
-                    {formatShortDate(pay.processedAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </GlassCard>
-
-      {/* M-Pesa STK Push Modal */}
-      {isStkModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-surface border border-border rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-elevated/70">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-primary" />
-                <h3 className="font-extrabold text-foreground text-base">Daraja M-Pesa STK Push</h3>
-              </div>
+      <section className="rounded-lg border border-border bg-surface shadow-xs">
+        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative lg:w-80">
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search payments"
+              placeholder="Search reference, phone or name"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn(inputClass, "pl-8")}
+            />
+          </div>
+          <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
+            {FILTERS.map((f) => (
               <button
-                onClick={() => setIsStkModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
+                key={f.value}
+                aria-pressed={filter === f.value}
+                onClick={() => setFilter(f.value)}
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors",
+                  filter === f.value
+                    ? "border-primary bg-primary-soft font-medium text-primary"
+                    : "border-border text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                )}
               >
-                <X className="w-5 h-5" />
+                {f.label}
+                <span className="tabular text-xs opacity-80">{counts[f.value]}</span>
               </button>
-            </div>
-
-            <form onSubmit={handleSendSTK} className="p-6 space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  Subscriber Account Reference *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={accRef}
-                  onChange={(e) => setAccRef(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  M-Pesa Phone Number *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                  Amount (KES) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                  className="w-full px-3.5 py-2 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary font-bold"
-                />
-              </div>
-
-              {stkStatus && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-                  <span>{stkStatus}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsStkModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-surface hover:bg-surface-elevated border border-border text-foreground text-xs font-bold transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSending}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold shadow-brand-btn transition"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSending ? "Sending Prompt..." : "Send STK Push Prompt"}</span>
-                </button>
-              </div>
-            </form>
+            ))}
           </div>
         </div>
+
+        {isLoading ? (
+          <TableSkeleton rows={8} cols={6} />
+        ) : filtered.length === 0 ? (
+          payments.length === 0 ? (
+            <EmptyState
+              icon={CreditCard}
+              title="No payments yet"
+              description="Payments confirmed through M-Pesa will be listed here automatically."
+            />
+          ) : (
+            <EmptyState
+              icon={CreditCard}
+              title="No payments match"
+              description="Try a different search or filter."
+              action={
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setFilter("ALL");
+                  }}
+                  className={btnClass("secondary")}
+                >
+                  Clear filters
+                </button>
+              }
+            />
+          )
+        ) : (
+          <>
+            <div className="max-h-[calc(100vh-27rem)] min-h-48 overflow-auto">
+              <table className="w-full min-w-[46rem] text-left text-sm">
+                <thead className="sticky top-0 z-10 border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-medium">Reference</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Subscriber</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Phone</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Method</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {rows.map((pay) => (
+                    <tr key={pay.id} className="hover:bg-surface-subtle">
+                      <td className="px-3 py-2 font-mono text-xs font-medium">{pay.transactionReference}</td>
+                      <td className="px-3 py-2">
+                        <div className="leading-5">{pay.customerName || pay.senderName || "Unmatched"}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{pay.accountNumber || "No account"}</div>
+                      </td>
+                      <td className="tabular px-3 py-2">{pay.msisdnPhone}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{METHOD_LABEL[pay.paymentMethod] ?? pay.paymentMethod}</td>
+                      <td className="tabular px-3 py-2 text-right font-medium">{formatKES(pay.amount)}</td>
+                      <td className="px-3 py-2"><StatusBadge status={pay.status} /></td>
+                      <td className="px-3 py-2 text-muted-foreground">{formatShortDate(pay.processedAt ?? pay.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground">
+              <span className="tabular">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="tabular px-2">{page} / {pageCount}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={page === pageCount}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      {isStkModalOpen && (
+        <StkDialog
+          onClose={closeStk}
+          onSubmit={handleSendSTK}
+          isSending={isSending}
+          message={stkMessage}
+          values={{ phone, amount, accRef }}
+          setters={{ setPhone, setAmount, setAccRef }}
+        />
       )}
     </AppShell>
+  );
+}
+
+function StkDialog({
+  onClose,
+  onSubmit,
+  isSending,
+  message,
+  values,
+  setters,
+}: {
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  isSending: boolean;
+  message: { tone: "ok" | "error"; text: string } | null;
+  values: { phone: string; amount: number | ""; accRef: string };
+  setters: {
+    setPhone: (v: string) => void;
+    setAmount: (v: number | "") => void;
+    setAccRef: (v: string) => void;
+  };
+}) {
+  const firstRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    firstRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const label = "mb-1 block text-sm font-medium text-foreground";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stk-title"
+        className="w-full max-w-md rounded-t-xl border border-border bg-surface shadow-[var(--shadow-pop)] sm:rounded-lg"
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <h3 id="stk-title" className="text-base font-semibold">Request M-Pesa payment</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-elevated"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-3 p-4">
+          <div>
+            <label htmlFor="stk-acc" className={label}>Subscriber account</label>
+            <input
+              id="stk-acc"
+              ref={firstRef}
+              type="text"
+              required
+              value={values.accRef}
+              onChange={(e) => setters.setAccRef(e.target.value)}
+              placeholder="e.g. GT-8921"
+              className={cn(inputClass, "font-mono")}
+            />
+          </div>
+          <div>
+            <label htmlFor="stk-phone" className={label}>M-Pesa phone number</label>
+            <input
+              id="stk-phone"
+              type="tel"
+              inputMode="tel"
+              required
+              value={values.phone}
+              onChange={(e) => setters.setPhone(e.target.value)}
+              placeholder="07XX XXX XXX"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="stk-amount" className={label}>Amount (KES)</label>
+            <input
+              id="stk-amount"
+              type="number"
+              min={1}
+              step={1}
+              required
+              value={values.amount}
+              onChange={(e) => setters.setAmount(e.target.value === "" ? "" : Number(e.target.value))}
+              className={inputClass}
+            />
+          </div>
+
+          {message && (
+            <div
+              role={message.tone === "error" ? "alert" : "status"}
+              className={cn(
+                "rounded-md border px-3 py-2 text-sm",
+                message.tone === "error"
+                  ? "border-danger/30 bg-danger-soft text-danger"
+                  : "border-success/30 bg-success-soft text-success"
+              )}
+            >
+              {message.text}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
+            <button type="button" onClick={onClose} className={btnClass("secondary")}>Close</button>
+            <button type="submit" disabled={isSending} className={btnClass("primary")}>
+              <Send className="h-4 w-4" aria-hidden="true" />
+              {isSending ? "Sending…" : "Send request"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

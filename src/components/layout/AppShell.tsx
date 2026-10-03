@@ -11,21 +11,17 @@ interface AppShellProps {
 
 export function AppShell({ title, children }: AppShellProps) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-primary/20 selection:text-primary transition-colors duration-200">
-      {/* Desktop Persistent Sidebar */}
-      <div className="hidden md:flex flex-shrink-0">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Desktop: persistent sidebar. Tablet: drawer from the topbar. Phone: bottom bar. */}
+      <div className="hidden shrink-0 lg:flex">
         <Sidebar />
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar title={title} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 pb-24 md:pb-8">
-          {children}
-        </main>
+        <main className="flex-1 space-y-4 overflow-y-auto p-4 pb-20 md:pb-6 lg:p-6">{children}</main>
       </div>
 
-      {/* Mobile & Tablet Persistent Bottom Navigation */}
       <BottomNav />
     </div>
   );
