@@ -38,6 +38,9 @@ import {
   ArrowUpRight,
   TrendingUp,
   Check,
+  ChevronDown,
+  Gauge,
+  Network,
 } from "lucide-react";
 import { WindowFrame } from "@/components/ui/WindowFrame";
 import { useTheme } from "@/components/theme/ThemeProvider";
@@ -46,12 +49,30 @@ import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { AnimatedNetworkGlobe } from "@/components/ui/AnimatedNetworkGlobe";
+import {
+  FreeToolsSection,
+  type FreeToolId,
+} from "@/components/tools/FreeToolsSection";
+import { PricingSection } from "@/components/pricing/PricingSection";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const [selectedFreeTool, setSelectedFreeTool] =
+    useState<FreeToolId>("speed-test");
   const [activeTab, setActiveTab] = useState<"PPPOE" | "HOTSPOT">("PPPOE");
   const { theme, toggleTheme } = useTheme();
   const { enterDemoMode, user } = useAuth();
+
+  const jumpToFreeTool = (toolId: FreeToolId) => {
+    setSelectedFreeTool(toolId);
+    setToolsMenuOpen(false);
+    setMobileMenuOpen(false);
+    const el = document.getElementById("free-tools");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary transition-colors duration-200">
@@ -68,31 +89,152 @@ export default function HomePage() {
             <nav className="hidden md:flex items-center space-x-1 bg-surface px-4 py-1.5 rounded-full border border-border shadow-xs">
               <a
                 href="#platform"
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Platform
               </a>
               <a
                 href="#how-it-works"
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 How It Works
               </a>
               <a
                 href="#features"
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Features
               </a>
               <a
                 href="#architecture"
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Architecture
               </a>
+
+              {/* Free Tools Dropdown */}
+              <div
+                className="relative"
+                onMouseEnter={() => setToolsMenuOpen(true)}
+                onMouseLeave={() => setToolsMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  aria-expanded={toolsMenuOpen}
+                  aria-haspopup="true"
+                  onClick={() => setToolsMenuOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors cursor-pointer"
+                >
+                  <span>Free Tools</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-150 ${
+                      toolsMenuOpen ? "rotate-180 text-primary" : ""
+                    }`}
+                  />
+                </button>
+
+                {toolsMenuOpen && (
+                  <div className="absolute left-0 top-full pt-2 w-72 z-50">
+                    <div className="p-2 rounded-2xl bg-surface border border-border shadow-lg space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => jumpToFreeTool("speed-test")}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        <Activity className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-foreground">
+                            Speed Test
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Download, upload, ping and jitter in one run
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => jumpToFreeTool("what-is-my-ip")}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        <Globe className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-foreground">
+                            What Is My IP
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Your public IP address and who it belongs to
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => jumpToFreeTool("bandwidth-calculator")}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        <Gauge className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-foreground">
+                            Bandwidth Calculator
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Size an upstream before you buy it
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => jumpToFreeTool("subnet-calculator")}
+                        className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        <Network className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-foreground">
+                            Subnet Calculator
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Split an IPv4 block and read off its hosts
+                          </div>
+                        </div>
+                      </button>
+
+                      <div className="pt-1 mt-1 border-t border-border">
+                        <Link
+                          href="/dashboard?demo=true"
+                          onClick={() => {
+                            setToolsMenuOpen(false);
+                            enterDemoMode();
+                          }}
+                          className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="text-xs font-bold text-foreground">
+                              Live Demo
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              The operator app, already filled with data
+                            </div>
+                          </div>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <a
+                href="#pricing"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+              >
+                Pricing
+              </a>
+
               <a
                 href="#comparison"
-                className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
               >
                 Why QC NetCore
               </a>
@@ -176,6 +318,20 @@ export default function HomePage() {
               className="block text-xs font-semibold text-foreground py-2 border-b border-border-subtle"
             >
               Technical Architecture
+            </a>
+            <a
+              href="#free-tools"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block text-xs font-semibold text-foreground py-2 border-b border-border-subtle"
+            >
+              Free Tools (Speed Test, IP, Bandwidth, Subnet)
+            </a>
+            <a
+              href="#pricing"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block text-xs font-semibold text-foreground py-2 border-b border-border-subtle"
+            >
+              Pricing
             </a>
             <div className="pt-2 flex flex-col gap-2">
               <Link
@@ -627,6 +783,16 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* FREE TOOLS SECTION */}
+      <FreeToolsSection
+        activeTool={selectedFreeTool}
+        onSelectTool={setSelectedFreeTool}
+        onEnterDemo={enterDemoMode}
+      />
+
+      {/* PRICING SECTION */}
+      <PricingSection />
+
       {/* FINAL CTA SECTION */}
       <section className="py-16 md:py-24 bg-surface border-t border-border">
         <div className="max-w-4xl mx-auto px-4 text-center space-y-6">
@@ -667,6 +833,8 @@ export default function HomePage() {
             &copy; {new Date().getFullYear()} QC NetCore. All rights reserved. ISP Network &amp; Billing Platform.
           </div>
           <div className="flex items-center space-x-4">
+            <a href="#free-tools" className="hover:text-foreground">Free Tools</a>
+            <a href="#pricing" className="hover:text-foreground">Pricing</a>
             <Link href="/sign-in" className="hover:text-foreground">Sign In</Link>
             <Link href="/register" className="hover:text-foreground">Register</Link>
             <Link href="/dashboard?demo=true" onClick={enterDemoMode} className="hover:text-foreground">Demo</Link>
