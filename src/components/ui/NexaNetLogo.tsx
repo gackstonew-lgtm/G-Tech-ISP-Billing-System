@@ -18,6 +18,6 @@ export function NexaNetIcon({ className }: { className?: string }) {
   return <GTechLogo showText={false} className={className} />;
 }
 
-export function NexaNetLogo({ variant = "horizontal", className }: NexaNetLogoProps) {
-  return <GTechLogo showText={variant !== "icon"} className={className} />;
+export function NexaNetLogo({ variant = "horizontal", size = "md", className }: NexaNetLogoProps) {
+  return <GTechLogo showText={variant !== "icon"} size={size} className={className} />;
 }

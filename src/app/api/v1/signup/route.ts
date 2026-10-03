@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
+import { classifyAuthError } from "@/lib/supabase/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +21,24 @@ export async function POST(req: NextRequest) {
 
     if (!fullName || !email || !password) {
       return NextResponse.json(
-        { success: false, error: "Full name, email, and password are required." },
+        {
+          success: false,
+          code: "VALIDATION_ERROR",
+          message: "Full name, email, and password are required.",
+          error: "Full name, email, and password are required.",
+        },
         { status: 400 }
       );
     }
 
     if (password.length < 6) {
       return NextResponse.json(
-        { success: false, error: "Password must be at least 6 characters long." },
+        {
+          success: false,
+          code: "VALIDATION_ERROR",
+          message: "Password must be at least 6 characters long.",
+          error: "Password must be at least 6 characters long.",
+        },
         { status: 400 }
       );
     }
@@ -49,15 +60,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (authError || !authData.user) {
-      // If user already exists, return friendly error
+      console.error("[Register API] Auth user creation failed:", authError);
       if (authError?.message?.includes("already") || authError?.code === "email_exists") {
+        const msg = "An account with this email address already exists.";
         return NextResponse.json(
-          { success: false, error: "An account with this email address already exists." },
+          { success: false, code: "EMAIL_EXISTS", message: msg, error: msg },
           { status: 409 }
         );
       }
+      const friendly = classifyAuthError(authError, "register");
       return NextResponse.json(
-        { success: false, error: authError?.message || "Failed to create user account." },
+        { success: false, code: "REGISTER_FAILED", message: friendly, error: friendly },
         { status: 400 }
       );
     }

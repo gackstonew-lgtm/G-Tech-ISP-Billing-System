@@ -7,6 +7,7 @@ import { Lock, Mail, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, User, Buildin
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { classifyAuthError, sanitizeUserMessage } from "@/lib/supabase/errors";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function SignInPage() {
@@ -41,17 +42,13 @@ export default function SignInPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { data, authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-      }) as any;
+      });
 
       if (authError) {
-        if (authError.message?.includes("Invalid login credentials")) {
-          setError("Invalid email or password. Please check your credentials and try again.");
-        } else {
-          setError(authError.message);
-        }
+        setError(classifyAuthError(authError, "login"));
         setIsSubmitting(false);
         return;
       }
@@ -60,8 +57,8 @@ export default function SignInPage() {
         await refreshAuth();
         router.push("/dashboard");
       }
-    } catch (err) {
-      setError("Unable to connect to authentication service. Please try again.");
+    } catch {
+      setError("Unable to sign in right now. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -98,7 +95,12 @@ export default function SignInPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.error || "Failed to create account. Please try again.");
+        setError(
+          sanitizeUserMessage(
+            data.message || data.error,
+            "Account could not be created. Please try again."
+          )
+        );
         setIsSubmitting(false);
         return;
       }

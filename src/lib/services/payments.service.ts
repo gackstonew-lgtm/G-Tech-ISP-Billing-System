@@ -7,6 +7,11 @@
 import type { Payment } from "@/types";
 import { SEED_PAYMENTS } from "@/lib/db/mock-db";
 import { handleSupabaseError } from "@/lib/supabase/errors";
+import {
+  aggregateRevenueByDay,
+  type RevenuePeriod,
+  type RevenueSeries,
+} from "@/lib/revenue";
 import type { ServiceResult } from "./customers.service";
 
 const SUPABASE_READY = Boolean(
@@ -62,6 +67,53 @@ export class PaymentsService {
       return { data: payments, error: null, count: count ?? payments.length };
     } catch (err) {
       const appError = handleSupabaseError(err, "payments.list");
+      return { data: null, error: appError.userMessage };
+    }
+  }
+
+  static async revenueByDay(options: { days?: RevenuePeriod; isDemo?: boolean } = {}): Promise<ServiceResult<RevenueSeries>> {
+    const days: RevenuePeriod = options.days === 30 ? 30 : 7;
+    const isDemo = await this.checkIsDemo(options.isDemo);
+
+    if (isDemo || !SUPABASE_READY) {
+      return {
+        data: aggregateRevenueByDay(SEED_PAYMENTS, days),
+        error: null,
+      };
+    }
+
+    try {
+      const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+      const supabase = await createSupabaseServerClient();
+
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - (days + 2));
+
+      const { data, error } = await supabase
+        .from("payments")
+        .select("amount, status, processed_at, created_at")
+        .eq("status", "COMPLETED")
+        .gte("created_at", cutoff.toISOString())
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        const appError = handleSupabaseError(error, "payments.revenueByDay");
+        return { data: null, error: appError.userMessage };
+      }
+
+      const rows = (data ?? []).map((r) => ({
+        amount: Number(r.amount),
+        status: r.status as string,
+        processedAt: (r.processed_at as string | null) ?? undefined,
+        createdAt: r.created_at as string,
+      }));
+
+      return {
+        data: aggregateRevenueByDay(rows, days),
+        error: null,
+      };
+    } catch (err) {
+      const appError = handleSupabaseError(err, "payments.revenueByDay");
       return { data: null, error: appError.userMessage };
     }
   }

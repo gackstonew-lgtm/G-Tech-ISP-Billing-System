@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mail, ArrowRight, ShieldCheck, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { classifyAuthError } from "@/lib/supabase/errors";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function ForgotPasswordPage() {
@@ -28,12 +29,12 @@ export default function ForgotPasswordPage() {
       });
 
       if (resetErr) {
-        setError(resetErr.message);
+        setError(classifyAuthError(resetErr, "reset"));
       } else {
         setSuccess("Password reset instructions have been sent to your email address.");
       }
-    } catch (err) {
-      setError("Unable to process password reset. Please try again.");
+    } catch {
+      setError("Unable to send password reset instructions. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

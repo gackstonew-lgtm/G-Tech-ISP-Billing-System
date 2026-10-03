@@ -10,9 +10,11 @@ export const metadata: Metadata = {
   authors: [{ name: "G-Tech" }],
   manifest: "/manifest.json",
   icons: {
-    icon: "/logo.svg",
-    shortcut: "/logo.svg",
-    apple: "/logo.svg",
+    icon: [
+      { url: "/gtech-icon.png", type: "image/png", sizes: "400x400" },
+    ],
+    shortcut: "/gtech-icon.png",
+    apple: "/gtech-icon.png",
   },
 };
 

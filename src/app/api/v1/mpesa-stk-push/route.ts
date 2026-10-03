@@ -9,8 +9,9 @@ export async function POST(req: NextRequest) {
     const { phoneNumber, amount, accountReference, transactionDesc } = body;
 
     if (!phoneNumber || !amount || !accountReference) {
+      const msg = "Please enter a phone number, amount, and account reference.";
       return NextResponse.json(
-        { success: false, error: "Missing required fields (phoneNumber, amount, accountReference)" },
+        { success: false, code: "VALIDATION_ERROR", message: msg, error: msg },
         { status: 400 }
       );
     }
@@ -24,9 +25,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: unknown) {
-    const e = err as Error;
+    console.error("[M-Pesa STK Push] Request failed:", err);
+    const msg = "Payment could not be completed. Please try again.";
     return NextResponse.json(
-      { success: false, error: e.message },
+      { success: false, code: "PAYMENT_REQUEST_FAILED", message: msg, error: msg },
       { status: 500 }
     );
   }

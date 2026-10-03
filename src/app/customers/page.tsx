@@ -21,8 +21,8 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
+import { usePageSize } from "@/lib/preferences";
 
-const PAGE_SIZE = 25;
 type SortKey = "name" | "balance" | "expiry";
 
 const STATUS_FILTERS: { value: string; label: string }[] = [
@@ -37,6 +37,7 @@ const inputClass =
 
 export default function CustomersPage() {
   const { isDemoMode, isLoading: authLoading, user } = useAuth();
+  const [PAGE_SIZE] = usePageSize();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -89,7 +90,7 @@ export default function CustomersPage() {
   }, [authLoading, isDemoMode, user?.id]);
 
   // Reset to page 1 whenever the result set changes shape
-  useEffect(() => setPage(1), [searchTerm, statusFilter, sort]);
+  useEffect(() => setPage(1), [searchTerm, statusFilter, sort, PAGE_SIZE]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { ALL: customers.length };

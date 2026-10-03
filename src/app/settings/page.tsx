@@ -1,417 +1,958 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Building2,
-  Palette,
-  Network,
-  Router as RouterIcon,
-  ShieldAlert,
-  Layers,
-  Wifi,
-  CreditCard,
-  Smartphone,
-  Bell,
-  Users,
-  Lock,
-  SunMoon,
-  FileText,
+  Globe,
+  Sliders,
+  UserCheck,
   Save,
-  Check,
+  RotateCcw,
   RefreshCw,
-  Eye,
-  EyeOff,
-  Server,
-  Zap,
   CheckCircle2,
   AlertTriangle,
-  History,
-  Key,
+  Lock,
+  Sun,
+  Moon,
+  LogOut,
+  KeyRound,
+  X,
 } from "lucide-react";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { Navbar } from "@/components/layout/Navbar";
-import { SEED_ORGANIZATION } from "@/lib/db/mock-db";
+import { AppShell } from "@/components/layout/AppShell";
+import { PageHeader, btnClass } from "@/components/ui/PageHeader";
+import { ErrorState, Skeleton } from "@/components/ui/States";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { useAuth } from "@/lib/auth/auth-context";
+import { sanitizeUserMessage } from "@/lib/supabase/errors";
+import {
+  BILLING_CYCLE_TYPES,
+  SUPPORTED_CURRENCIES,
+  SUPPORTED_TIMEZONES,
+  validateOrganizationSettingsInput,
+  type BillingCycleType,
+  type OrganizationSettingsInput,
+  type SupportedCurrency,
+} from "@/lib/settings-validation";
+import {
+  ALLOWED_PAGE_SIZES,
+  usePageSize,
+  type PageSizeOption,
+} from "@/lib/preferences";
+import { cn, formatShortDate } from "@/lib/utils";
+import type { OrganizationRow } from "@/types/database.types";
 
-type SettingsCategory =
-  | "organization"
-  | "branding"
-  | "network"
-  | "mikrotik"
-  | "radius"
-  | "pppoe"
-  | "hotspot"
-  | "billing"
-  | "mpesa"
-  | "notifications"
-  | "roles"
-  | "security"
-  | "appearance"
-  | "audit";
+interface SettingsFormState {
+  name: string;
+  business_number: string;
+  email: string;
+  phone: string;
+  currency: SupportedCurrency;
+  timezone: string;
+  billing_cycle_type: BillingCycleType;
+  grace_period_days: string;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: "Administrator",
+  isp_owner: "Owner",
+  isp_admin: "Administrator",
+  finance: "Finance",
+  support: "Support",
+  technician: "Technician",
+  agent: "Agent",
+  customer: "Subscriber",
+  demo_viewer: "Demo Viewer",
+};
+
+function formatRoleLabel(role?: string | null, isDemo?: boolean): string {
+  if (role && ROLE_LABELS[role]) return ROLE_LABELS[role];
+  if (isDemo) return "Demo Viewer";
+  if (!role) return "Administrator";
+  return role.replace(/_/g, " ");
+}
+
+function orgToFormState(org: OrganizationRow): SettingsFormState {
+  const currencyUpper = (org.currency || "KES").toUpperCase();
+  const currency: SupportedCurrency = SUPPORTED_CURRENCIES.includes(
+    currencyUpper as SupportedCurrency
+  )
+    ? (currencyUpper as SupportedCurrency)
+    : "KES";
+
+  const billingCycle: BillingCycleType = BILLING_CYCLE_TYPES.includes(
+    org.billing_cycle_type as BillingCycleType
+  )
+    ? (org.billing_cycle_type as BillingCycleType)
+    : "ANNIVERSARY";
+
+  return {
+    name: org.name ?? "",
+    business_number: org.business_number ?? "",
+    email: org.email ?? "",
+    phone: org.phone ?? "",
+    currency,
+    timezone: org.timezone || "Africa/Nairobi",
+    billing_cycle_type: billingCycle,
+    grace_period_days: String(org.grace_period_days ?? 2),
+  };
+}
+
+const inputClass =
+  "h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:text-muted-foreground";
 
 export default function SettingsPage() {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("organization");
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const {
+    user,
+    profile,
+    isDemoMode,
+    isLoading: authLoading,
+    refreshAuth,
+    exitDemoMode,
+    signOut,
+  } = useAuth();
   const { theme, setTheme } = useTheme();
+  const [pageSize, setPageSize] = usePageSize();
 
-  // Form States
-  const [orgName, setOrgName] = useState(SEED_ORGANIZATION.name);
-  const [orgSlug, setOrgSlug] = useState(SEED_ORGANIZATION.slug);
-  const [orgEmail, setOrgEmail] = useState(SEED_ORGANIZATION.email);
-  const [orgPhone, setOrgPhone] = useState(SEED_ORGANIZATION.phone);
-  const [currency, setCurrency] = useState("KES");
-  const [billingCycle, setBillingCycle] = useState("ANNIVERSARY");
-  const [gracePeriod, setGracePeriod] = useState("2");
+  const [savedOrg, setSavedOrg] = useState<OrganizationRow | null>(null);
+  const [form, setForm] = useState<SettingsFormState | null>(null);
+  const [role, setRole] = useState<string>("operator");
+  const [canEdit, setCanEdit] = useState<boolean>(false);
+  const [isDemoResponse, setIsDemoResponse] = useState<boolean>(false);
 
-  // M-Pesa State
-  const [paybill, setPaybill] = useState("4084200");
-  const [consumerKey, setConsumerKey] = useState("ck_live_98a7sd6f5a4sd3f2");
-  const [consumerSecret, setConsumerSecret] = useState("cs_live_0987as6f5d4sa3f21");
-  const [passkey, setPasskey] = useState("bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919");
-  const [showSecrets, setShowSecrets] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof OrganizationSettingsInput | "general", string>>
+  >({});
+  const [banner, setBanner] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [confirmModalOpen, setConfirmModalOpen] = useState<boolean>(false);
 
-  // RADIUS State
-  const [radiusHost, setRadiusHost] = useState("10.100.0.1");
-  const [radiusSecret, setRadiusSecret] = useState("G-TechRadiusSecret2025!");
-  const [showRadiusSecret, setShowRadiusSecret] = useState(false);
+  const loadSettings = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/v1/settings", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json?.success || !json.data?.organization) {
+        setLoadError(
+          sanitizeUserMessage(
+            json?.message || json?.error,
+            "Unable to load settings. Please try again."
+          )
+        );
+        return;
+      }
+      const org: OrganizationRow = json.data.organization;
+      setSavedOrg(org);
+      setForm(orgToFormState(org));
+      setRole(json.data.role || "operator");
+      setCanEdit(Boolean(json.data.canEdit));
+      setIsDemoResponse(Boolean(json.data.isDemo));
+      setFieldErrors({});
+    } catch (err) {
+      console.error("[Settings] load failed:", err);
+      setLoadError("Unable to load settings. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  useEffect(() => {
+    if (authLoading) return;
+    setIsLoading(true);
+    loadSettings();
+  }, [authLoading, isDemoMode, loadSettings]);
+
+  const baselineForm = useMemo(
+    () => (savedOrg ? orgToFormState(savedOrg) : null),
+    [savedOrg]
+  );
+
+  const isDirty = useMemo(() => {
+    if (!form || !baselineForm) return false;
+    return (
+      form.name.trim() !== baselineForm.name.trim() ||
+      form.business_number.trim() !== baselineForm.business_number.trim() ||
+      form.email.trim() !== baselineForm.email.trim() ||
+      form.phone.trim() !== baselineForm.phone.trim() ||
+      form.currency !== baselineForm.currency ||
+      form.timezone !== baselineForm.timezone ||
+      form.billing_cycle_type !== baselineForm.billing_cycle_type ||
+      form.grace_period_days.trim() !== baselineForm.grace_period_days.trim()
+    );
+  }, [form, baselineForm]);
+
+  const hasSensitiveBillingChange = useMemo(() => {
+    if (!form || !baselineForm) return false;
+    return (
+      form.currency !== baselineForm.currency ||
+      form.billing_cycle_type !== baselineForm.billing_cycle_type ||
+      form.grace_period_days.trim() !== baselineForm.grace_period_days.trim()
+    );
+  }, [form, baselineForm]);
+
+  // Warn before closing tab with unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  const updateField = <K extends keyof SettingsFormState>(
+    key: K,
+    value: SettingsFormState[K]
+  ) => {
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setFieldErrors((prev) => ({ ...prev, [key]: undefined, general: undefined }));
+    setBanner(null);
   };
 
-  const SETTINGS_TABS = [
-    { id: "organization", label: "Organization & General", icon: Building2 },
-    { id: "branding", label: "Branding & Portal", icon: Palette },
-    { id: "network", label: "Network & POP Sites", icon: Network },
-    { id: "mikrotik", label: "MikroTik Routers", icon: RouterIcon },
-    { id: "radius", label: "RADIUS Engine", icon: Server },
-    { id: "pppoe", label: "PPPoE Services", icon: Layers },
-    { id: "hotspot", label: "Hotspot & Vouchers", icon: Wifi },
-    { id: "billing", label: "Billing & Invoices", icon: CreditCard },
-    { id: "mpesa", label: "M-Pesa & Payments", icon: Smartphone },
-    { id: "notifications", label: "Notifications & Alerts", icon: Bell },
-    { id: "roles", label: "Staff & RBAC Roles", icon: Users },
-    { id: "security", label: "Security & Sessions", icon: Lock },
-    { id: "appearance", label: "Appearance & Theme", icon: SunMoon },
-    { id: "audit", label: "System Audit Logs", icon: History },
-  ];
+  const handleDiscard = () => {
+    if (!savedOrg) return;
+    setForm(orgToFormState(savedOrg));
+    setFieldErrors({});
+    setBanner(null);
+  };
+
+  const buildValidatedPayload = (): OrganizationSettingsInput | null => {
+    if (!form) return null;
+    const check = validateOrganizationSettingsInput({
+      name: form.name,
+      business_number: form.business_number.trim() || null,
+      email: form.email,
+      phone: form.phone,
+      currency: form.currency,
+      timezone: form.timezone,
+      billing_cycle_type: form.billing_cycle_type,
+      grace_period_days: Number(form.grace_period_days),
+    });
+    if (!check.valid || !check.data) {
+      setFieldErrors(check.errors);
+      setBanner({
+        tone: "error",
+        text: "Please check the highlighted fields and try again.",
+      });
+      return null;
+    }
+    setFieldErrors({});
+    return check.data;
+  };
+
+  const executeSave = async () => {
+    const payload = buildValidatedPayload();
+    if (!payload) return;
+
+    setConfirmModalOpen(false);
+    setIsSaving(true);
+    setBanner(null);
+
+    try {
+      const res = await fetch("/api/v1/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json?.success || !json.data) {
+        if (json?.fieldErrors) {
+          setFieldErrors(json.fieldErrors);
+        }
+        setBanner({
+          tone: "error",
+          text: sanitizeUserMessage(
+            json?.message || json?.error,
+            "Changes could not be saved. Please try again."
+          ),
+        });
+        return;
+      }
+
+      const updated: OrganizationRow = json.data;
+      setSavedOrg(updated);
+      setForm(orgToFormState(updated));
+      setBanner({
+        tone: "success",
+        text: "Your changes have been saved.",
+      });
+      await refreshAuth();
+    } catch (err) {
+      console.error("[Settings] save failed:", err);
+      setBanner({
+        tone: "error",
+        text: "Changes could not be saved. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canEdit || isSaving || !isDirty) return;
+    const payload = buildValidatedPayload();
+    if (!payload) return;
+
+    if (hasSensitiveBillingChange) {
+      setConfirmModalOpen(true);
+      return;
+    }
+    await executeSave();
+  };
+
+  const displayName =
+    profile?.full_name ||
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.email ? user.email.split("@")[0] : null) ||
+    (isDemoResponse ? "Demo Operator" : "Administrator");
+
+  const displayRole = formatRoleLabel(profile?.role || role, isDemoResponse);
+
+  const header = (
+    <PageHeader
+      title="Settings"
+      description="Manage your organization profile, billing rules, workspace preferences, and account."
+      actions={
+        <button
+          type="button"
+          onClick={loadSettings}
+          disabled={isLoading || isSaving}
+          className={btnClass("secondary")}
+        >
+          <RefreshCw
+            className={cn("h-4 w-4", isLoading && "animate-spin")}
+            aria-hidden="true"
+          />
+          Refresh
+        </button>
+      }
+    />
+  );
+
+  if (isLoading || !form || !savedOrg) {
+    return (
+      <AppShell title="Settings">
+        {header}
+        {loadError ? (
+          <ErrorState
+            title="Unable to load settings"
+            detail={loadError}
+            onRetry={loadSettings}
+          />
+        ) : (
+          <div role="status" aria-label="Loading settings" className="space-y-4">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        )}
+      </AppShell>
+    );
+  }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/20 selection:text-primary">
-      {/* Sidebar */}
-      <div className="hidden md:flex md:shrink-0">
-        <Sidebar />
-      </div>
+    <AppShell title="Settings">
+      {header}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Navbar title="Platform Settings &amp; Configuration" />
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Top Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight flex items-center gap-2">
-                  <span>ISP Configuration Hub</span>
-                </h1>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Manage organization profile, network integration, M-Pesa credentials, RADIUS, and RBAC permissions.
-                </p>
+      {/* Demo or Read-Only Permission Notice */}
+      {isDemoResponse ? (
+        <div
+          role="region"
+          aria-label="Demo mode notice"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-sm"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 shrink-0 text-warning"
+              aria-hidden="true"
+            />
+            <div>
+              <div className="font-semibold text-foreground">
+                Demo Mode — Organization settings are read-only
               </div>
-
-              {saveSuccess && (
-                <div className="px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-bold flex items-center gap-2 animate-pulse">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Settings updated successfully!</span>
-                </div>
-              )}
-            </div>
-
-            {/* Layout Grid: Left Nav + Right Form */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-              {/* Category Navigation */}
-              <div className="lg:col-span-1 p-2 rounded-2xl bg-surface border border-border space-y-1 shadow-xs">
-                {SETTINGS_TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeCategory === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveCategory(tab.id as SettingsCategory)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                        isActive
-                          ? "bg-primary text-primary-foreground font-bold shadow-xs"
-                          : "text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{tab.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Form Content Area */}
-              <div className="lg:col-span-3 p-6 sm:p-8 rounded-2xl bg-surface border border-border shadow-xs space-y-6">
-                <form onSubmit={handleSave} className="space-y-6">
-                  {/* CATEGORY 1: ORGANIZATION */}
-                  {activeCategory === "organization" && (
-                    <div className="space-y-5">
-                      <div className="border-b border-border-subtle pb-3">
-                        <h2 className="text-base font-extrabold text-foreground">Organization Profile</h2>
-                        <p className="text-xs text-muted-foreground">General details for your ISP account.</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">ISP Business Name</label>
-                          <input
-                            type="text"
-                            value={orgName}
-                            onChange={(e) => setOrgName(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Organization Slug</label>
-                          <input
-                            type="text"
-                            value={orgSlug}
-                            onChange={(e) => setOrgSlug(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Support Email</label>
-                          <input
-                            type="email"
-                            value={orgEmail}
-                            onChange={(e) => setOrgEmail(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Support Phone</label>
-                          <input
-                            type="text"
-                            value={orgPhone}
-                            onChange={(e) => setOrgPhone(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Currency</label>
-                          <input
-                            type="text"
-                            value={currency}
-                            onChange={(e) => setCurrency(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Grace Period (Days)</label>
-                          <input
-                            type="number"
-                            value={gracePeriod}
-                            onChange={(e) => setGracePeriod(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CATEGORY 2: M-PESA & PAYMENTS */}
-                  {activeCategory === "mpesa" && (
-                    <div className="space-y-5">
-                      <div className="border-b border-border-subtle pb-3 flex items-center justify-between">
-                        <div>
-                          <h2 className="text-base font-extrabold text-foreground">Safaricom Daraja M-Pesa Integration</h2>
-                          <p className="text-xs text-muted-foreground">Configure STK Push Express and Paybill C2B callback credentials.</p>
-                        </div>
-                        <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[10px] font-bold">
-                          Active API Gateway
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Business Shortcode / Paybill Number</label>
-                          <input
-                            type="text"
-                            value={paybill}
-                            onChange={(e) => setPaybill(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground focus:outline-none focus:border-primary font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-bold text-foreground">Consumer Key</label>
-                            <button
-                              type="button"
-                              onClick={() => setShowSecrets(!showSecrets)}
-                              className="text-[11px] font-semibold text-primary hover:underline"
-                            >
-                              {showSecrets ? "Hide Credentials" : "Show Credentials"}
-                            </button>
-                          </div>
-                          <input
-                            type={showSecrets ? "text" : "password"}
-                            value={consumerKey}
-                            onChange={(e) => setConsumerKey(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Consumer Secret</label>
-                          <input
-                            type={showSecrets ? "text" : "password"}
-                            value={consumerSecret}
-                            onChange={(e) => setConsumerSecret(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground font-mono"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Lipa Na M-Pesa Passkey</label>
-                          <textarea
-                            rows={2}
-                            value={passkey}
-                            onChange={(e) => setPasskey(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs text-foreground font-mono resize-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CATEGORY 3: RADIUS */}
-                  {activeCategory === "radius" && (
-                    <div className="space-y-5">
-                      <div className="border-b border-border-subtle pb-3">
-                        <h2 className="text-base font-extrabold text-foreground">FreeRADIUS Engine Settings</h2>
-                        <p className="text-xs text-muted-foreground">PostgreSQL rlm_sql authentication and accounting configuration.</p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">RADIUS Server Host IP</label>
-                          <input
-                            type="text"
-                            value={radiusHost}
-                            onChange={(e) => setRadiusHost(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs font-mono text-foreground"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-foreground mb-1">Accounting Port</label>
-                          <input
-                            type="text"
-                            value="1813"
-                            disabled
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs font-mono text-muted-foreground cursor-not-allowed"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="block text-xs font-bold text-foreground">NAS Shared Secret</label>
-                            <button
-                              type="button"
-                              onClick={() => setShowRadiusSecret(!showRadiusSecret)}
-                              className="text-[11px] font-semibold text-primary hover:underline"
-                            >
-                              {showRadiusSecret ? "Hide Secret" : "Show Secret"}
-                            </button>
-                          </div>
-                          <input
-                            type={showRadiusSecret ? "text" : "password"}
-                            value={radiusSecret}
-                            onChange={(e) => setRadiusSecret(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl bg-surface-subtle border border-border text-xs font-mono text-foreground"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* CATEGORY 4: APPEARANCE */}
-                  {activeCategory === "appearance" && (
-                    <div className="space-y-5">
-                      <div className="border-b border-border-subtle pb-3">
-                        <h2 className="text-base font-extrabold text-foreground">Appearance &amp; Theme</h2>
-                        <p className="text-xs text-muted-foreground">Customize UI color mode across dark and light themes.</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => setTheme("dark")}
-                          className={`p-4 rounded-xl border text-left transition ${
-                            theme === "dark"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-surface-subtle text-muted-foreground"
-                          }`}
-                        >
-                          <div className="font-extrabold text-sm mb-1">Dark Mode (Default Operations)</div>
-                          <div className="text-xs opacity-75">High-contrast dark theme optimized for network operations monitors.</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTheme("light")}
-                          className={`p-4 rounded-xl border text-left transition ${
-                            theme === "light"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-surface-subtle text-muted-foreground"
-                          }`}
-                        >
-                          <div className="font-extrabold text-sm mb-1">Light Mode</div>
-                          <div className="text-xs opacity-75">Clean daylight theme for administrative staff and report viewing.</div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* OTHER CATEGORIES FALLBACK PLACEHOLDER */}
-                  {!["organization", "mpesa", "radius", "appearance"].includes(activeCategory) && (
-                    <div className="space-y-4">
-                      <div className="border-b border-border-subtle pb-3">
-                        <h2 className="text-base font-extrabold text-foreground capitalize">
-                          {activeCategory.replace("-", " ")} Configuration
-                        </h2>
-                        <p className="text-xs text-muted-foreground">Active configuration settings for this module.</p>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-surface-subtle border border-border text-xs text-muted-foreground space-y-2">
-                        <div className="font-bold text-foreground flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          <span>Module Operational</span>
-                        </div>
-                        <p>All active parameters for {activeCategory} are synchronized with the PostgreSQL schema and service layer.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Save Button Bar */}
-                  <div className="pt-4 border-t border-border flex items-center justify-end">
-                    <button
-                      type="submit"
-                      className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs hover:bg-primary-hover transition-colors shadow-xs flex items-center gap-2"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Save Configuration</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Workspace preferences (theme and default table page size) apply immediately in your browser. Sign in to an administrator account to save organization changes.
+              </p>
             </div>
           </div>
-        </main>
+          <button
+            type="button"
+            onClick={exitDemoMode}
+            className={btnClass("secondary")}
+          >
+            Sign in to live account
+          </button>
+        </div>
+      ) : !canEdit ? (
+        <div
+          role="region"
+          aria-label="Permission notice"
+          className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-4 py-3 text-xs text-muted-foreground"
+        >
+          <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span>
+            Your role (<strong className="font-medium text-foreground">{displayRole}</strong>) has view-only access to organization settings. Only organization owners and administrators can modify these settings.
+          </span>
+        </div>
+      ) : null}
+
+      {banner && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm",
+            banner.tone === "success"
+              ? "border-success/30 bg-success-soft text-success"
+              : "border-danger/30 bg-danger-soft text-danger"
+          )}
+        >
+          {banner.tone === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span>{banner.text}</span>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left 2 Columns: Organization & Billing Settings */}
+        <div className="space-y-6 lg:col-span-2">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
+            {/* Section 1: Organization Profile */}
+            <section className="rounded-lg border border-border bg-surface shadow-xs">
+              <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">
+                      Organization profile
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Business details displayed across your console, invoices, and subscriber communications.
+                    </p>
+                  </div>
+                </div>
+                {isDirty && canEdit && (
+                  <span className="rounded-md border border-warning/30 bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">
+                    Unsaved changes
+                  </span>
+                )}
+              </header>
+
+              <div className="grid gap-4 p-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="org-name"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    ISP business name
+                  </label>
+                  <input
+                    id="org-name"
+                    type="text"
+                    disabled={!canEdit || isSaving}
+                    value={form.name}
+                    onChange={(e) => updateField("name", e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                  {fieldErrors.name && (
+                    <p className="mt-1 text-xs text-danger">{fieldErrors.name}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-slug"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Workspace identifier
+                  </label>
+                  <input
+                    id="org-slug"
+                    type="text"
+                    disabled
+                    value={savedOrg.slug}
+                    className={cn(inputClass, "font-mono")}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Assigned when your organization was registered.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-email"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Support email
+                  </label>
+                  <input
+                    id="org-email"
+                    type="email"
+                    disabled={!canEdit || isSaving}
+                    value={form.email}
+                    onChange={(e) => updateField("email", e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                  {fieldErrors.email && (
+                    <p className="mt-1 text-xs text-danger">{fieldErrors.email}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-phone"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Support phone
+                  </label>
+                  <input
+                    id="org-phone"
+                    type="tel"
+                    disabled={!canEdit || isSaving}
+                    value={form.phone}
+                    onChange={(e) => updateField("phone", e.target.value)}
+                    className={inputClass}
+                    required
+                  />
+                  {fieldErrors.phone && (
+                    <p className="mt-1 text-xs text-danger">{fieldErrors.phone}</p>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label
+                    htmlFor="org-business-number"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Paybill / business registration number
+                  </label>
+                  <input
+                    id="org-business-number"
+                    type="text"
+                    disabled={!canEdit || isSaving}
+                    value={form.business_number}
+                    onChange={(e) => updateField("business_number", e.target.value)}
+                    placeholder="e.g. 4084200"
+                    className={cn(inputClass, "font-mono")}
+                  />
+                  {fieldErrors.business_number ? (
+                    <p className="mt-1 text-xs text-danger">
+                      {fieldErrors.business_number}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Shown on subscriber payment instructions and billing receipts.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Section 2: Regional & Billing Parameters */}
+            <section className="rounded-lg border border-border bg-surface shadow-xs">
+              <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+                <Globe className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    Regional &amp; billing policy
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Default currency, timezone, and subscription renewal rules for your organization.
+                  </p>
+                </div>
+              </header>
+
+              <div className="grid gap-4 p-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="org-currency"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Default currency
+                  </label>
+                  <select
+                    id="org-currency"
+                    disabled={!canEdit || isSaving}
+                    value={form.currency}
+                    onChange={(e) =>
+                      updateField("currency", e.target.value as SupportedCurrency)
+                    }
+                    className={inputClass}
+                  >
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.currency && (
+                    <p className="mt-1 text-xs text-danger">{fieldErrors.currency}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-timezone"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Operating timezone
+                  </label>
+                  <select
+                    id="org-timezone"
+                    disabled={!canEdit || isSaving}
+                    value={form.timezone}
+                    onChange={(e) => updateField("timezone", e.target.value)}
+                    className={inputClass}
+                  >
+                    {SUPPORTED_TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.timezone && (
+                    <p className="mt-1 text-xs text-danger">{fieldErrors.timezone}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-billing-cycle"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Billing cycle mode
+                  </label>
+                  <select
+                    id="org-billing-cycle"
+                    disabled={!canEdit || isSaving}
+                    value={form.billing_cycle_type}
+                    onChange={(e) =>
+                      updateField(
+                        "billing_cycle_type",
+                        e.target.value as BillingCycleType
+                      )
+                    }
+                    className={inputClass}
+                  >
+                    <option value="ANNIVERSARY">
+                      Anniversary (renews from activation date)
+                    </option>
+                    <option value="CALENDAR_MONTH">
+                      Calendar month (resets on the 1st)
+                    </option>
+                  </select>
+                  {fieldErrors.billing_cycle_type && (
+                    <p className="mt-1 text-xs text-danger">
+                      {fieldErrors.billing_cycle_type}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="org-grace-days"
+                    className="mb-1 block text-xs font-medium text-foreground"
+                  >
+                    Grace period (days, 0–30)
+                  </label>
+                  <input
+                    id="org-grace-days"
+                    type="number"
+                    min={0}
+                    max={30}
+                    step={1}
+                    disabled={!canEdit || isSaving}
+                    value={form.grace_period_days}
+                    onChange={(e) =>
+                      updateField("grace_period_days", e.target.value)
+                    }
+                    className={cn(inputClass, "tabular")}
+                  />
+                  {fieldErrors.grace_period_days && (
+                    <p className="mt-1 text-xs text-danger">
+                      {fieldErrors.grace_period_days}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Form Footer Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
+                <div className="text-xs text-muted-foreground">
+                  Last updated: {formatShortDate(savedOrg.updated_at)}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    disabled={!isDirty || isSaving}
+                    className={btnClass("secondary")}
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    Discard
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!canEdit || !isDirty || isSaving}
+                    className={btnClass("primary")}
+                  >
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                    {isSaving ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </form>
+        </div>
+
+        {/* Right Column: Workspace Preferences + Account & Session */}
+        <div className="space-y-6">
+          {/* Section 3: Operator Workspace Preferences */}
+          <section className="rounded-lg border border-border bg-surface shadow-xs">
+            <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <Sliders className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Workspace preferences
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Display and table settings applied immediately on this device.
+                </p>
+              </div>
+            </header>
+
+            <div className="space-y-4 p-4">
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-foreground">
+                  Appearance
+                </div>
+                <div
+                  role="group"
+                  aria-label="Appearance"
+                  className="grid grid-cols-2 gap-2"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={theme === "light"}
+                    onClick={() => setTheme("light")}
+                    className={cn(
+                      "flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors",
+                      theme === "light"
+                        ? "border-primary bg-primary-soft text-primary"
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Sun className="h-4 w-4" aria-hidden="true" />
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={theme === "dark"}
+                    onClick={() => setTheme("dark")}
+                    className={cn(
+                      "flex h-9 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors",
+                      theme === "dark"
+                        ? "border-primary bg-primary-soft text-primary"
+                        : "border-border bg-surface text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Moon className="h-4 w-4" aria-hidden="true" />
+                    Dark
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="pref-page-size"
+                  className="mb-1.5 block text-xs font-medium text-foreground"
+                >
+                  Default table rows per page
+                </label>
+                <select
+                  id="pref-page-size"
+                  value={pageSize}
+                  onChange={(e) =>
+                    setPageSize(Number(e.target.value) as PageSizeOption)
+                  }
+                  className={inputClass}
+                >
+                  {ALLOWED_PAGE_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size} rows per page
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Used for{" "}
+                  <Link href="/customers" className="text-primary hover:underline">
+                    Subscribers
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/billing" className="text-primary hover:underline">
+                    Payments
+                  </Link>{" "}
+                  tables.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 4: Account & Session */}
+          <section className="rounded-lg border border-border bg-surface shadow-xs">
+            <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <UserCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Account &amp; session
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Signed-in operator identity and security actions.
+                </p>
+              </div>
+            </header>
+
+            <div className="space-y-3 p-4 text-xs">
+              <div className="rounded-md border border-border bg-surface-subtle p-3 space-y-1">
+                <div className="text-sm font-semibold text-foreground">
+                  {displayName}
+                </div>
+                <div className="text-muted-foreground">{displayRole}</div>
+                {user?.email && (
+                  <div className="truncate text-muted-foreground">{user.email}</div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                {!isDemoResponse && (
+                  <Link
+                    href="/forgot-password"
+                    className={cn(btnClass("secondary"), "w-full justify-center")}
+                  >
+                    <KeyRound className="h-4 w-4" aria-hidden="true" />
+                    Reset password
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => signOut()}
+                  className={cn(btnClass("secondary"), "w-full justify-center text-danger hover:bg-danger-soft")}
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal for Currency / Billing Policy Changes */}
+      {confirmModalOpen && baselineForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-billing-title"
+        >
+          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-[var(--shadow-pop)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2 text-warning">
+                <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <h3
+                  id="confirm-billing-title"
+                  className="text-sm font-semibold text-foreground"
+                >
+                  Confirm billing policy change
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmModalOpen(false)}
+                aria-label="Close confirmation dialog"
+                className="rounded-md p-1 text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-muted-foreground">
+              You are updating your organization&apos;s billing policy. Please review the changes before saving:
+            </p>
+
+            <ul className="mt-3 space-y-1.5 rounded-md border border-border bg-surface-subtle p-3 text-xs">
+              {form.currency !== baselineForm.currency && (
+                <li>
+                  Currency:{" "}
+                  <strong className="font-mono text-foreground">
+                    {baselineForm.currency}
+                  </strong>{" "}
+                  →{" "}
+                  <strong className="font-mono text-primary">
+                    {form.currency}
+                  </strong>
+                </li>
+              )}
+              {form.billing_cycle_type !== baselineForm.billing_cycle_type && (
+                <li>
+                  Billing cycle:{" "}
+                  <strong className="font-mono text-foreground">
+                    {baselineForm.billing_cycle_type}
+                  </strong>{" "}
+                  →{" "}
+                  <strong className="font-mono text-primary">
+                    {form.billing_cycle_type}
+                  </strong>
+                </li>
+              )}
+              {form.grace_period_days.trim() !==
+                baselineForm.grace_period_days.trim() && (
+                <li>
+                  Grace period:{" "}
+                  <strong className="font-mono text-foreground">
+                    {baselineForm.grace_period_days} days
+                  </strong>{" "}
+                  →{" "}
+                  <strong className="font-mono text-primary">
+                    {form.grace_period_days} days
+                  </strong>
+                </li>
+              )}
+            </ul>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModalOpen(false)}
+                className={btnClass("secondary")}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeSave}
+                disabled={isSaving}
+                className={btnClass("primary")}
+              >
+                {isSaving ? "Saving…" : "Confirm & save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AppShell>
   );
 }

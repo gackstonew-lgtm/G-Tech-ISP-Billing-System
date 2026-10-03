@@ -10,8 +10,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
-
-const PAGE_SIZE = 25;
+import { usePageSize } from "@/lib/preferences";
 
 const METHOD_LABEL: Record<Payment["paymentMethod"], string> = {
   MPESA_EXPRESS: "M-Pesa STK",
@@ -34,6 +33,7 @@ const inputClass =
 
 export default function BillingPage() {
   const { isDemoMode, isLoading: authLoading, user } = useAuth();
+  const [PAGE_SIZE] = usePageSize();
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,7 +77,7 @@ export default function BillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isDemoMode, user?.id]);
 
-  useEffect(() => setPage(1), [searchTerm, filter]);
+  useEffect(() => setPage(1), [searchTerm, filter, PAGE_SIZE]);
 
   const bucket = (p: Payment): Filter =>
     p.status === "COMPLETED" ? "COMPLETED" : p.status === "FAILED" ? "FAILED" : p.status === "REVERSED" ? "ALL" : "PENDING";

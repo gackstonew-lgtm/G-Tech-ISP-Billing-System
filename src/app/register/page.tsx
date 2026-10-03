@@ -7,6 +7,7 @@ import { Lock, Mail, User, Building, ArrowRight, ShieldCheck, Sun, Moon, Sparkle
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { classifyAuthError, sanitizeUserMessage } from "@/lib/supabase/errors";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 
 export default function RegisterPage() {
@@ -47,7 +48,7 @@ export default function RegisterPage() {
       });
 
       if (authError) {
-        setError(authError.message);
+        setError(classifyAuthError(authError, "login"));
         setIsSubmitting(false);
         return;
       }
@@ -56,8 +57,8 @@ export default function RegisterPage() {
         await refreshAuth();
         router.push("/dashboard");
       }
-    } catch (err) {
-      setError("Unable to connect to authentication service. Please try again.");
+    } catch {
+      setError("Unable to sign in right now. Please try again.");
       setIsSubmitting(false);
     }
   };
@@ -94,7 +95,12 @@ export default function RegisterPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setError(data.error || "Failed to create account. Please try again.");
+        setError(
+          sanitizeUserMessage(
+            data.message || data.error,
+            "Account could not be created. Please try again."
+          )
+        );
         setIsSubmitting(false);
         return;
       }

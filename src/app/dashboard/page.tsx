@@ -24,6 +24,12 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/States";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import {
+  aggregateRevenueByDay,
+  type DailyRevenueBucket,
+  type RevenuePeriod,
+} from "@/lib/revenue";
 
 // ---------- helpers ----------
 
@@ -38,33 +44,6 @@ function timeAgo(iso?: string): string {
   if (h < 24) return `${h} h ago`;
   const d = Math.floor(h / 24);
   return `${d} d ago`;
-}
-
-type Period = 7 | 30;
-
-/** Sum COMPLETED payments per local calendar day for the last N days. */
-function collectedByDay(payments: Payment[], days: Period) {
-  const buckets: { key: string; label: string; total: number }[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    buckets.push({
-      key: d.toDateString(),
-      label: d.toLocaleDateString("en-KE", { day: "numeric", month: "short" }),
-      total: 0,
-    });
-  }
-  const index = new Map(buckets.map((b) => [b.key, b]));
-  for (const p of payments) {
-    if (p.status !== "COMPLETED") continue;
-    const when = new Date(p.processedAt ?? p.createdAt);
-    when.setHours(0, 0, 0, 0);
-    const b = index.get(when.toDateString());
-    if (b) b.total += p.amount;
-  }
-  return buckets;
 }
 
 // ---------- small building blocks ----------
@@ -142,10 +121,11 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<NOCStats | null>(null);
   const [routers, setRouters] = useState<Router[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [serverRevenueBuckets, setServerRevenueBuckets] = useState<DailyRevenueBucket[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [period, setPeriod] = useState<Period>(7);
+  const [period, setPeriod] = useState<RevenuePeriod>(7);
 
   const load = useCallback(async () => {
     setError(null);
@@ -153,21 +133,31 @@ export default function DashboardPage() {
       setStats(getSeedNOCStats());
       setRouters(SEED_ROUTERS);
       setPayments(SEED_PAYMENTS);
+      setServerRevenueBuckets(null);
       setIsLoading(false);
       return;
     }
     try {
-      const [nocRes, routerRes, payRes] = await Promise.all([
+      const [nocRes, routerRes, payRes, revRes] = await Promise.all([
         fetch("/api/v1/monitoring/noc"),
         fetch("/api/v1/mikrotik-fleet"),
         fetch("/api/v1/payments?limit=500"),
+        fetch("/api/v1/payments/revenue?days=30"),
       ]);
-      const [noc, fleet, pay] = await Promise.all([nocRes.json(), routerRes.json(), payRes.json()]);
+      const [noc, fleet, pay, rev] = await Promise.all([
+        nocRes.json(),
+        routerRes.json(),
+        payRes.json(),
+        revRes.json().catch(() => null),
+      ]);
 
       if (noc?.success && noc.data) setStats(noc.data);
       else throw new Error("Operations statistics are unavailable.");
       setRouters(fleet?.success ? fleet.data : []);
       setPayments(pay?.success ? pay.data : []);
+      setServerRevenueBuckets(
+        rev?.success && Array.isArray(rev.data?.buckets) ? rev.data.buckets : null
+      );
     } catch (err) {
       console.error("[Dashboard] load failed:", err);
       setError("Some dashboard data could not be loaded. Nothing was changed.");
@@ -237,9 +227,17 @@ export default function DashboardPage() {
     return rows.sort((x, y) => new Date(y.when).getTime() - new Date(x.when).getTime()).slice(0, 8);
   }, [payments, stats]);
 
-  const buckets = useMemo(() => collectedByDay(payments, period), [payments, period]);
-  const periodTotal = buckets.reduce((s, b) => s + b.total, 0);
-  const maxBucket = Math.max(...buckets.map((b) => b.total), 1);
+  const buckets = useMemo(() => {
+    if (serverRevenueBuckets && serverRevenueBuckets.length >= period) {
+      return serverRevenueBuckets.slice(-period);
+    }
+    return aggregateRevenueByDay(payments, period).buckets;
+  }, [serverRevenueBuckets, payments, period]);
+
+  const periodTotal = useMemo(
+    () => buckets.reduce((s, b) => s + b.total, 0),
+    [buckets]
+  );
 
   const today = new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -360,9 +358,10 @@ export default function DashboardPage() {
                   <div className="text-xs text-muted-foreground">Completed payments, last {period} days</div>
                 </div>
                 <div role="group" aria-label="Period" className="inline-flex rounded-md border border-border p-0.5">
-                  {([7, 30] as Period[]).map((p) => (
+                  {([7, 30] as RevenuePeriod[]).map((p) => (
                     <button
                       key={p}
+                      type="button"
                       aria-pressed={period === p}
                       onClick={() => setPeriod(p)}
                       className={cn(
@@ -376,34 +375,12 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {periodTotal === 0 ? (
-                <EmptyState
-                  icon={CreditCard}
-                  title="No completed payments in this period"
-                  description="Payments confirmed through M-Pesa will appear here as they are reconciled."
-                  className="py-8"
-                />
-              ) : (
-                <div className="mt-4">
-                  <div className="flex h-36 items-end gap-px" role="img" aria-label={`Daily collected revenue, last ${period} days`}>
-                    {buckets.map((b) => (
-                      <div key={b.key} className="group relative flex h-full flex-1 items-end">
-                        <div
-                          className={cn("w-full rounded-t-sm", b.total > 0 ? "bg-primary" : "bg-surface-elevated")}
-                          style={{ height: `${Math.max((b.total / maxBucket) * 100, b.total > 0 ? 3 : 1)}%` }}
-                          title={`${b.label}: ${formatKES(b.total)}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                    <span>{buckets[0].label}</span>
-                    <span>{buckets[buckets.length - 1].label}</span>
-                  </div>
-                  {payments.length >= 500 && (
-                    <p className="mt-2 text-xs text-muted-foreground">Based on the latest 500 payments.</p>
-                  )}
-                </div>
+              <RevenueChart buckets={buckets} period={period} className="mt-4" />
+
+              {periodTotal === 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No completed payments recorded in the last {period} days. Confirmed M-Pesa transactions will appear here automatically.
+                </p>
               )}
             </div>
           </Panel>

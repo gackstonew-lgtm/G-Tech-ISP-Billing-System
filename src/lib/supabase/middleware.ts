@@ -18,6 +18,7 @@ const PROTECTED_ROUTES = [
   "/plans",
   "/monitoring",
   "/technicians",
+  "/settings",
 ];
 
 const AUTH_ROUTES = ["/sign-in", "/register"];
