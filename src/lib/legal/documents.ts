@@ -3,7 +3,7 @@
 // ============================================================================
 // Strict non-fabrication guarantee:
 // - Uses only verified contact endpoints (WhatsApp 0712052104 / +254712052104,
-//   Email 1uantumcode7777@gmail.com).
+//   Email quantumcode7777@gmail.com).
 // - Reflects the actual technical implementation of QC NetCore (multi-tenant
 //   PostgreSQL RLS, MikroTik RouterOS API/WireGuard, FreeRADIUS AAA, M-Pesa
 //   Daraja STK Push / C2B transaction metadata, essential localStorage/cookies).
@@ -14,8 +14,8 @@
 export const LEGAL_CONTACT = {
   platformName: "QC NetCore",
   fullPlatformTitle: "QC NetCore ISP Network & Billing Operating System",
-  email: "1uantumcode7777@gmail.com",
-  mailtoUrl: "mailto:1uantumcode7777@gmail.com",
+  email: "quantumcode7777@gmail.com",
+  mailtoUrl: "mailto:quantumcode7777@gmail.com",
   whatsappLocal: "0712052104",
   whatsappInternational: "+254 712 052 104",
   whatsappDigits: "254712052104",
@@ -142,7 +142,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "You are solely responsible for maintaining the confidentiality of your operator credentials, Supabase authentication tokens, MikroTik API credentials, RADIUS shared secrets, WireGuard keys, and payment gateway API keys configured within your tenant workspace.",
         ],
         bullets: [
-          "Immediately notify QC NetCore at 1uantumcode7777@gmail.com if you suspect unauthorized access to your operator dashboard or router credentials.",
+          "Immediately notify QC NetCore at quantumcode7777@gmail.com if you suspect unauthorized access to your operator dashboard or router credentials.",
           "Enforce role-based access control (RBAC) for staff, technicians, and billing administrators within your organization.",
           "Do not share single administrative accounts across multiple unauthorized individuals.",
         ],
@@ -207,7 +207,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
         paragraphs: [
           "You agree to indemnify and hold harmless QC NetCore from any third-party claims, regulatory fines, or subscriber disputes arising out of your operation of an ISP network, your retail pricing or refund practices, or your violation of applicable telecommunications or data protection laws.",
           "Either party may terminate an account in accordance with our Refund & Cancellation Policy. Upon termination, ISP Operators may request a structured export of their subscriber and billing records prior to tenant decommissioning.",
-          "These Terms are governed by the laws of the Republic of Kenya and applicable international commercial principles, without regard to conflict-of-law rules. Any disputes shall first be addressed through good-faith executive negotiation via 1uantumcode7777@gmail.com.",
+          "These Terms are governed by the laws of the Republic of Kenya and applicable international commercial principles, without regard to conflict-of-law rules. Any disputes shall first be addressed through good-faith executive negotiation via quantumcode7777@gmail.com.",
         ],
       },
       {
@@ -218,7 +218,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "For all questions, contractual notices, or compliance inquiries regarding these Terms of Service, please contact QC NetCore directly:",
         ],
         bullets: [
-          "Email: 1uantumcode7777@gmail.com",
+          "Email: quantumcode7777@gmail.com",
           "WhatsApp / Direct Line: 0712052104 (+254 712 052 104)",
         ],
       },
@@ -264,7 +264,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "Subscriber & Customer CRM Data (Tenant-Scoped): Subscriber name, phone number, email address (optional), installation location/notes, assigned service plan, account status, and expiration timestamps.",
           "Network & Session Telemetry: Device MAC address, assigned local/public IP address, PPPoE username, NAS/MikroTik router identifier, session start/stop times, bandwidth upload/download counters, and voucher codes.",
           "Payment & Billing Metadata: M-Pesa receipt/transaction reference codes (e.g., QK89X...), payer phone number, transaction amount, currency, invoice ID, and timestamp. QC NetCore NEVER collects or stores M-Pesa PINs.",
-          "Support & Communication Records: Inquiries submitted via WhatsApp (0712052104), email (1uantumcode7777@gmail.com), or support ticket logs.",
+          "Support & Communication Records: Inquiries submitted via WhatsApp (0712052104), email (quantumcode7777@gmail.com), or support ticket logs.",
         ],
       },
       {
@@ -328,7 +328,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "To exercise your data protection rights or ask questions about our privacy practices, contact our Privacy & Compliance team:",
         ],
         bullets: [
-          "Email: 1uantumcode7777@gmail.com (Subject: Privacy Request — QC NetCore)",
+          "Email: quantumcode7777@gmail.com (Subject: Privacy Request — QC NetCore)",
           "WhatsApp: 0712052104 (+254 712 052 104)",
         ],
       },
@@ -455,7 +455,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
         number: "4",
         title: "Monitoring, Violation Reporting & Enforcement",
         paragraphs: [
-          "QC NetCore and its ISP Operators reserve the right to immediately suspend or terminate any voucher, subscriber session, or tenant workspace that violates this policy or threatens platform stability. Suspected abuse can be reported to 1uantumcode7777@gmail.com.",
+          "QC NetCore and its ISP Operators reserve the right to immediately suspend or terminate any voucher, subscriber session, or tenant workspace that violates this policy or threatens platform stability. Suspected abuse can be reported to quantumcode7777@gmail.com.",
         ],
       },
     ],
@@ -523,7 +523,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "To request a billing review, reconciliation check, or subscription cancellation, please provide the M-Pesa Transaction Reference Code (e.g., QK...), payer phone number, date/time of payment, and tenant/ISP name to:",
         ],
         bullets: [
-          "Email: 1uantumcode7777@gmail.com",
+          "Email: quantumcode7777@gmail.com",
           "WhatsApp Support: 0712052104 (+254 712 052 104)",
         ],
       },
@@ -653,7 +653,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
         ],
         bullets: [
           "Direct WhatsApp Escalation: 0712052104 (+254 712 052 104)",
-          "Support & Engineering Email: 1uantumcode7777@gmail.com",
+          "Support & Engineering Email: quantumcode7777@gmail.com",
         ],
       },
     ],
@@ -796,7 +796,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
     version: LEGAL_CONTACT.version,
     summaryPoints: [
       "Welcomes good-faith vulnerability reports from security researchers and ISP network engineers.",
-      "Provides direct reporting channels via 1uantumcode7777@gmail.com and WhatsApp 0712052104.",
+      "Provides direct reporting channels via quantumcode7777@gmail.com and WhatsApp 0712052104.",
       "Establishes clear rules of engagement to protect live ISP tenants and subscriber connectivity during security research.",
     ],
     sections: [
@@ -816,7 +816,7 @@ export const LEGAL_DOCUMENTS: Record<LegalDocumentSlug, LegalDocument> = {
           "Please send a detailed technical report to our Security & Engineering team via one of our verified channels:",
         ],
         bullets: [
-          "Security Email: 1uantumcode7777@gmail.com (Subject line: 'SECURITY DISCLOSURE — QC NetCore')",
+          "Security Email: quantumcode7777@gmail.com (Subject line: 'SECURITY DISCLOSURE — QC NetCore')",
           "Urgent Security Escalation (WhatsApp): 0712052104 (+254 712 052 104)",
           "Include: Affected URL/endpoint, step-by-step reproduction instructions, proof-of-concept (PoC) screenshots or HTTP requests, and potential security impact.",
         ],

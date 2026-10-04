@@ -3,7 +3,7 @@
 // Realistic production-grade sample dataset for Kenyan ISP operation
 // ====================================================================
 
-import {
+import type {
   Organization,
   User,
   Site,
@@ -19,7 +19,7 @@ import {
   WorkOrder,
   NetworkAlert,
   NOCStats,
-} from "@/types";
+} from "../../types/index.ts";
 
 export const SEED_ORGANIZATION: Organization = {
   id: "org-nexanet-01",

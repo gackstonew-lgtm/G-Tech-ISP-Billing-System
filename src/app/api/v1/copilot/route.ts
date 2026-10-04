@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
-import { runCopilotQuery } from "@/lib/ai/copilot";
-import { buildSeedCopilotSnapshot } from "@/lib/db/os-2027-seed";
+import {
+  executeCopilotIntelligence,
+  type CopilotConversationMemory,
+} from "@/lib/ai/copilot";
+import { loadLiveOrDemoCopilotEnvironment } from "@/lib/ai/live-data-loader";
+import { hasPermission } from "@/lib/auth/rbac";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+    const memory = (body?.conversationContext || undefined) as
+      | CopilotConversationMemory
+      | undefined;
+    const explicitDemoMode =
+      typeof body?.isDemoMode === "boolean" ? body.isDemoMode : undefined;
 
     if (!prompt) {
       return NextResponse.json(
@@ -14,8 +25,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const snapshot = buildSeedCopilotSnapshot();
-    const result = runCopilotQuery(prompt, snapshot);
+    const { ctx, dataset } = await loadLiveOrDemoCopilotEnvironment({
+      explicitDemoMode,
+    });
+
+    if (!hasPermission(ctx.userRole, "copilot.use")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You don't have permission to use the AI Operations Copilot.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const result = executeCopilotIntelligence({
+      prompt,
+      ctx,
+      dataset,
+      memory,
+    });
 
     return NextResponse.json({
       success: true,

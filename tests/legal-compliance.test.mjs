@@ -13,7 +13,7 @@ test("Legal documents data module defines all 10 required legal policies and ver
   const src = readProjectFile("src/lib/legal/documents.ts");
 
   // Verified Contact Details
-  assert.match(src, /1uantumcode7777@gmail\.com/);
+  assert.match(src, /quantumcode7777@gmail\.com/);
   assert.match(src, /0712052104/);
   assert.match(src, /https:\/\/wa\.me\/254712052104\?text=/);
 

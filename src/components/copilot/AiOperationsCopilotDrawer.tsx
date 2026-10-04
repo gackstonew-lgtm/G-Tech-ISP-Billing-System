@@ -8,17 +8,28 @@ import {
   CheckCircle2,
   Terminal,
   ShieldCheck,
+  Database,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { btnClass } from "@/components/ui/PageHeader";
-import { runCopilotQuery, CopilotResponse } from "@/lib/ai/copilot";
+import {
+  runCopilotQuery,
+  type CopilotResponse,
+  type CopilotConversationMemory,
+} from "@/lib/ai/copilot";
 import { buildSeedCopilotSnapshot } from "@/lib/db/os-2027-seed";
+import { useAuth } from "@/lib/auth/auth-context";
 
 const QUICK_PROMPTS = [
+  "Who is our newest subscriber?",
   "Why is David Koech (GT-8923) offline?",
-  "Which subscribers have high churn risk or optical attenuation?",
-  "Summarize today's MRR, ARPU, and Trial Balance",
-  "Check NOC router and GPON OLT status",
+  "Which customers owe us the most?",
+  "How much did we collect today?",
+  "Which package generated the most revenue?",
+  "Which router has the most active sessions?",
+  "How is the business performing?",
+  "How does PPPoE billing work?",
 ];
 
 export function AiOperationsCopilotDrawer({
@@ -28,7 +39,10 @@ export function AiOperationsCopilotDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const { isDemoMode } = useAuth();
   const [prompt, setPrompt] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [memory, setMemory] = useState<CopilotConversationMemory>({});
   const [history, setHistory] = useState<
     Array<{ query: string; response: CopilotResponse }>
   >(() => {
@@ -46,13 +60,43 @@ export function AiOperationsCopilotDrawer({
 
   if (!open) return null;
 
-  const handleAsk = (qText: string) => {
+  const handleAsk = async (qText: string) => {
     const trimmed = qText.trim();
-    if (!trimmed) return;
-    const snap = buildSeedCopilotSnapshot();
-    const res = runCopilotQuery(trimmed, snap);
-    setHistory((prev) => [{ query: trimmed, response: res }, ...prev]);
+    if (!trimmed || isLoading) return;
     setPrompt("");
+    setIsLoading(true);
+
+    try {
+      const apiRes = await fetch("/api/v1/copilot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: trimmed,
+          conversationContext: memory,
+          isDemoMode,
+        }),
+      });
+      const json = await apiRes.json();
+
+      if (json?.success && json.data) {
+        const res = json.data as CopilotResponse;
+        if (res.conversationContext) {
+          setMemory(res.conversationContext);
+        }
+        setHistory((prev) => [{ query: trimmed, response: res }, ...prev]);
+        setIsLoading(false);
+        return;
+      }
+    } catch {
+      // Fallback to local execution if offline
+    }
+
+    const fallbackRes = runCopilotQuery(trimmed, undefined, memory);
+    if (fallbackRes.conversationContext) {
+      setMemory(fallbackRes.conversationContext);
+    }
+    setHistory((prev) => [{ query: trimmed, response: fallbackRes }, ...prev]);
+    setIsLoading(false);
   };
 
   return (
@@ -73,11 +117,24 @@ export function AiOperationsCopilotDrawer({
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold">
-                AI ISP Operations Copilot
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">
+                  AI ISP Operations Copilot
+                </h2>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold",
+                    isDemoMode
+                      ? "border-primary/30 bg-primary-soft text-primary"
+                      : "border-success/30 bg-success/10 text-success"
+                  )}
+                >
+                  <Database className="h-2.5 w-2.5" />
+                  {isDemoMode ? "DEMO DATA" : "LIVE TENANT DATA"}
+                </span>
+              </div>
               <p className="text-[11px] text-muted-foreground">
-                Grounded in live Ledger, MikroTik/RADIUS, and GPON OLT telemetry
+                Live tool-driven access to Subscribers, Ledger, MikroTik/RADIUS &amp; NOC
               </p>
             </div>
           </div>
@@ -94,7 +151,7 @@ export function AiOperationsCopilotDrawer({
         {/* Quick Prompts */}
         <div className="border-b border-border bg-surface-subtle p-3">
           <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-            Suggested diagnostics:
+            Ask live operational questions:
           </div>
           <div className="flex flex-wrap gap-1.5">
             {QUICK_PROMPTS.map((qp) => (
@@ -117,14 +174,32 @@ export function AiOperationsCopilotDrawer({
               key={`${item.query}-${idx}`}
               className="rounded-lg border border-border bg-surface-subtle p-3.5 space-y-3"
             >
-              <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
                 <span className="font-semibold text-primary">
                   Q: {item.query}
                 </span>
-                <span className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                <span className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                   {item.response.intent}
                 </span>
               </div>
+
+              {/* Tools Invoked Traceability Bar */}
+              {item.response.toolsInvoked && item.response.toolsInvoked.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                    <Wrench className="h-3 w-3 text-primary" />
+                    Tools invoked:
+                  </span>
+                  {item.response.toolsInvoked.map((tName, tIdx) => (
+                    <span
+                      key={`${tName}-${tIdx}`}
+                      className="rounded bg-surface border border-border px-1.5 py-0.5 font-mono text-[10px] text-primary"
+                    >
+                      {tName}()
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <div className="font-semibold text-foreground">
@@ -212,17 +287,18 @@ export function AiOperationsCopilotDrawer({
           <input
             type="text"
             aria-label="Ask AI ISP Operations Copilot"
-            placeholder="Ask about subscribers, optical dBm, MRR, or outages…"
+            placeholder="Ask about newest subscriber, IPs, overdue accounts, revenue, or routers…"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             className="h-9 flex-1 rounded-md border border-border bg-surface px-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <button
             type="submit"
+            disabled={isLoading}
             className={cn(btnClass("primary", "h-9 px-3 text-xs"))}
           >
             <Send className="h-3.5 w-3.5" />
-            Ask
+            {isLoading ? "Querying…" : "Ask"}
           </button>
         </form>
       </div>

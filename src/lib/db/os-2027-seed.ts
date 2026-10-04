@@ -11,52 +11,52 @@ import {
   SEED_ROUTERS,
   SEED_PPPOE,
   SEED_SUBSCRIPTIONS,
-} from "./mock-db";
+} from "./mock-db.ts";
 
 import {
-  JournalEntry,
+  type JournalEntry,
   postInvoiceToLedger,
   postPaymentToLedger,
   postCreditNoteToLedger,
   computeTrialBalance,
   computeArAgingBuckets,
   computeExecutiveRevenueMetrics,
-} from "../ledger/ledger";
+} from "../ledger/ledger.ts";
 
 import {
-  ApprovalRequestRecord,
-  PaymentReconciliationResult,
+  type ApprovalRequestRecord,
+  type PaymentReconciliationResult,
   reconcileIncomingPayment,
-} from "../payments/reconciliation";
+} from "../payments/reconciliation.ts";
 
-import {
+import type {
   OltDevice,
   OntDevice,
-} from "../network/olt-cpe";
+} from "../network/olt-cpe.ts";
 
-import {
+import type {
   InventoryItemRecord,
   SerializedAssetRecord,
   SupportTicketRecord,
-} from "../operations/field-inventory-support";
+} from "../operations/field-inventory-support.ts";
 
-import {
+import type {
   TopologyNode,
   GisFiberNode,
   AutomationRule,
-} from "../network/topology-gis-automation";
+} from "../network/topology-gis-automation.ts";
 
-import {
+import type {
   SystemEvent,
   SecurityEvent,
-} from "../events/event-bus";
+} from "../events/event-bus.ts";
 
 import {
   computeConnectionQualityScore,
   predictSubscriberChurnRisk,
-} from "../intelligence/subscriber-360";
+} from "../intelligence/subscriber-360.ts";
 
-import { CopilotContextSnapshot } from "../ai/copilot";
+import type { CopilotContextSnapshot } from "../ai/copilot.ts";
 
 export const SEED_INVOICES_2027 = [
   {
