@@ -11,15 +11,19 @@ import {
   Router as RouterIcon,
   RefreshCw,
   UserPlus,
-  CheckCircle2,
-  ChevronRight,
   Banknote,
-  Bell,
+  Cpu,
+  HardDrive,
+  Activity,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Server,
+  AlertTriangle,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { getSeedNOCStats, SEED_PAYMENTS, SEED_ROUTERS } from "@/lib/db/mock-db";
 import type { NOCStats, Router, Payment } from "@/types";
-import { cn, formatKES, formatShortDate } from "@/lib/utils";
+import { cn, formatKES } from "@/lib/utils";
 import { useAuth } from "@/lib/auth/auth-context";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
@@ -44,6 +48,110 @@ function timeAgo(iso?: string): string {
   if (h < 24) return `${h} h ago`;
   const d = Math.floor(h / 24);
   return `${d} d ago`;
+}
+
+function getBoardTotalRamMb(boardModel: string, freeMemoryMb: number): number | null {
+  if (!Number.isFinite(freeMemoryMb) || freeMemoryMb <= 0) return null;
+  const model = (boardModel || "").toUpperCase();
+  if (model.includes("CCR2116")) return Math.max(16384, freeMemoryMb);
+  if (model.includes("CCR2004")) return Math.max(4096, freeMemoryMb);
+  if (model.includes("RB5009") || model.includes("RB4011") || model.includes("RB3011")) {
+    return Math.max(1024, freeMemoryMb);
+  }
+  if (model.includes("RB750") || model.includes("HEX") || model.includes("HAP")) {
+    return Math.max(256, freeMemoryMb);
+  }
+  const standardTiers = [256, 512, 1024, 2048, 4096, 8192, 16384];
+  for (const tier of standardTiers) {
+    if (tier >= freeMemoryMb) return tier;
+  }
+  return Math.ceil(freeMemoryMb / 1024) * 1024;
+}
+
+function getUsageThreshold(pct: number): {
+  label: "Normal" | "Moderate" | "High" | "Critical";
+  barClass: string;
+  badgeClass: string;
+  strokeColor: string;
+} {
+  if (pct >= 90) {
+    return {
+      label: "Critical",
+      barClass: "bg-danger",
+      badgeClass: "border-danger/30 bg-danger/10 text-danger",
+      strokeColor: "#ef4444",
+    };
+  }
+  if (pct >= 75) {
+    return {
+      label: "High",
+      barClass: "bg-warning",
+      badgeClass: "border-warning/30 bg-warning/10 text-warning",
+      strokeColor: "#f59e0b",
+    };
+  }
+  if (pct >= 50) {
+    return {
+      label: "Moderate",
+      barClass: "bg-primary",
+      badgeClass: "border-primary/30 bg-primary/10 text-primary",
+      strokeColor: "#2563eb",
+    };
+  }
+  return {
+    label: "Normal",
+    barClass: "bg-success",
+    badgeClass: "border-success/30 bg-success/10 text-success",
+    strokeColor: "#10b981",
+  };
+}
+
+function CircularGauge({
+  percentage,
+  strokeColor,
+  unavailable = false,
+}: {
+  percentage: number;
+  strokeColor: string;
+  unavailable?: boolean;
+}) {
+  const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = unavailable
+    ? circumference
+    : circumference - (clamped / 100) * circumference;
+
+  return (
+    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+      <svg className="h-14 w-14 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
+        <circle
+          cx="28"
+          cy="28"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="5"
+          className="text-border"
+        />
+        <circle
+          cx="28"
+          cy="28"
+          r={radius}
+          fill="none"
+          stroke={unavailable ? "currentColor" : strokeColor}
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          className="transition-all duration-500 ease-out"
+        />
+      </svg>
+      <span className="tabular absolute text-xs font-bold text-foreground">
+        {unavailable ? "—" : `${clamped}%`}
+      </span>
+    </div>
+  );
 }
 
 // ---------- small building blocks ----------
@@ -126,6 +234,7 @@ export default function DashboardPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<RevenuePeriod>(7);
+  const [selectedRouterId, setSelectedRouterId] = useState<string>("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -179,53 +288,17 @@ export default function DashboardPage() {
   };
 
   // ----- derived (all from loaded data) -----
-  const failedPayments = payments.filter((p) => p.status === "FAILED").length;
-  const pendingPayments = payments.filter((p) => p.status === "PENDING" || p.status === "INITIATED").length;
   const offlineRouters = stats ? Math.max(stats.totalRouters - stats.onlineRouters, 0) : 0;
   const openAlerts = stats?.recentAlerts.filter((a) => !a.isResolved) ?? [];
-  const criticalAlerts = openAlerts.filter((a) => a.severity === "CRITICAL").length;
 
-  const attention = useMemo(() => {
-    if (!stats) return [];
-    const items: { key: string; text: string; href: string; tone: "warning" | "danger" }[] = [];
-    if (stats.expiringIn24h > 0)
-      items.push({ key: "exp", text: `${stats.expiringIn24h} subscription${stats.expiringIn24h > 1 ? "s" : ""} expire within 24 hours`, href: "/customers", tone: "warning" });
-    if (failedPayments > 0)
-      items.push({ key: "fail", text: `${failedPayments} failed payment${failedPayments > 1 ? "s" : ""}`, href: "/billing", tone: "danger" });
-    if (pendingPayments > 0)
-      items.push({ key: "pend", text: `${pendingPayments} pending M-Pesa transaction${pendingPayments > 1 ? "s" : ""}`, href: "/billing", tone: "warning" });
-    if (offlineRouters > 0)
-      items.push({ key: "rtr", text: `${offlineRouters} router${offlineRouters > 1 ? "s" : ""} offline`, href: "/routers", tone: "danger" });
-    if (criticalAlerts > 0)
-      items.push({ key: "alert", text: `${criticalAlerts} critical network alert${criticalAlerts > 1 ? "s" : ""}`, href: "/monitoring", tone: "danger" });
-    if (stats.suspendedCount > 0)
-      items.push({ key: "susp", text: `${stats.suspendedCount} suspended subscriber${stats.suspendedCount > 1 ? "s" : ""}`, href: "/customers", tone: "warning" });
-    return items;
-  }, [stats, failedPayments, pendingPayments, offlineRouters, criticalAlerts]);
-
-  const activity = useMemo(() => {
-    const rows: { key: string; when: string; title: string; detail: string; tone: "success" | "danger" | "warning" | "info" }[] = [];
-    for (const p of payments.slice(0, 8)) {
-      const who = p.senderName || p.customerName || p.msisdnPhone;
-      rows.push({
-        key: `p-${p.id}`,
-        when: p.processedAt ?? p.createdAt,
-        title: p.status === "COMPLETED" ? "Payment received" : p.status === "FAILED" ? "Payment failed" : "Payment pending",
-        detail: `${formatKES(p.amount)} from ${who} · ${p.transactionReference}`,
-        tone: p.status === "COMPLETED" ? "success" : p.status === "FAILED" ? "danger" : "warning",
-      });
+  const selectedRouter = useMemo(() => {
+    if (routers.length === 0) return null;
+    if (selectedRouterId) {
+      const found = routers.find((r) => r.id === selectedRouterId);
+      if (found) return found;
     }
-    for (const a of stats?.recentAlerts.slice(0, 5) ?? []) {
-      rows.push({
-        key: `a-${a.id}`,
-        when: a.createdAt,
-        title: a.title,
-        detail: a.message,
-        tone: a.severity === "CRITICAL" ? "danger" : a.severity === "WARNING" ? "warning" : "info",
-      });
-    }
-    return rows.sort((x, y) => new Date(y.when).getTime() - new Date(x.when).getTime()).slice(0, 8);
-  }, [payments, stats]);
+    return routers.find((r) => r.status === "ONLINE") ?? routers[0];
+  }, [routers, selectedRouterId]);
 
   const buckets = useMemo(() => {
     if (serverRevenueBuckets && serverRevenueBuckets.length >= period) {
@@ -452,68 +525,322 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-4">
-          {/* Needs attention */}
-          <Panel title="Needs attention">
-            {attention.length === 0 ? (
-              <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
-                Nothing needs action right now.
-              </div>
+          {/* MikroTik Hardware Status */}
+          <Panel title="MikroTik hardware status" action={{ href: "/routers", label: "Manage fleet" }}>
+            {!selectedRouter ? (
+              <EmptyState
+                icon={RouterIcon}
+                title="MikroTik Disconnected"
+                description="No MikroTik routers are connected yet. Add a RouterOS node to view live CPU, memory, and system gauges."
+                className="py-8"
+                action={
+                  <Link href="/routers" className={btnClass("primary")}>
+                    Connect MikroTik
+                  </Link>
+                }
+              />
             ) : (
-              <ul className="divide-y divide-border-subtle">
-                {attention.map((item) => (
-                  <li key={item.key}>
-                    <Link
-                      href={item.href}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-surface-subtle"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn("h-2 w-2 shrink-0 rounded-full", item.tone === "danger" ? "bg-danger" : "bg-warning")}
+              (() => {
+                const isRouterOnline = selectedRouter.status === "ONLINE";
+                const cpuPct = isRouterOnline ? Math.max(0, Math.min(100, selectedRouter.cpuLoad)) : 0;
+                const cpuThreshold = getUsageThreshold(cpuPct);
+
+                const totalRamMb = isRouterOnline
+                  ? getBoardTotalRamMb(selectedRouter.boardModel, selectedRouter.freeMemoryMb)
+                  : null;
+                const usedRamMb =
+                  totalRamMb !== null
+                    ? Math.max(0, totalRamMb - selectedRouter.freeMemoryMb)
+                    : null;
+                const ramPct =
+                  totalRamMb && usedRamMb !== null
+                    ? Math.max(0, Math.min(100, Math.round((usedRamMb / totalRamMb) * 100)))
+                    : 0;
+                const ramThreshold = getUsageThreshold(ramPct);
+
+                return (
+                  <div className="divide-y divide-border-subtle">
+                    {/* Router selector + identity */}
+                    <div className="space-y-2.5 px-4 py-3">
+                      {routers.length > 1 && (
+                        <div>
+                          <label htmlFor="dashboard-router-select" className="sr-only">
+                            Select MikroTik router
+                          </label>
+                          <select
+                            id="dashboard-router-select"
+                            value={selectedRouter.id}
+                            onChange={(e) => setSelectedRouterId(e.target.value)}
+                            className="w-full rounded-md border border-border bg-surface-subtle px-2.5 py-1.5 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                          >
+                            {routers.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name} ({r.boardModel} · {r.status})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Server className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                            <span className="truncate text-sm font-semibold text-foreground">
+                              {selectedRouter.name}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {selectedRouter.boardModel || "RouterBOARD"} · RouterOS{" "}
+                            {selectedRouter.routerosVersion || "—"}
+                          </div>
+                        </div>
+                        <StatusBadge status={selectedRouter.status} />
+                      </div>
+
+                      {!isRouterOnline && (
+                        <div className="flex items-center gap-2 rounded-md border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs text-danger">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span>
+                            Router {selectedRouter.status.toLowerCase()} · Last seen{" "}
+                            {timeAgo(selectedRouter.lastSeenAt)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 1. CPU Usage Gauge */}
+                    <div className="flex items-center gap-3.5 px-4 py-3">
+                      <CircularGauge
+                        percentage={cpuPct}
+                        strokeColor={cpuThreshold.strokeColor}
+                        unavailable={!isRouterOnline}
                       />
-                      <span className="flex-1">{item.text}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                            <Cpu className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            CPU Usage
+                          </span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                              isRouterOnline
+                                ? cpuThreshold.badgeClass
+                                : "border-border bg-surface-subtle text-muted-foreground"
+                            )}
+                          >
+                            {isRouterOnline ? cpuThreshold.label : "Offline"}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              isRouterOnline ? cpuThreshold.barClass : "bg-border"
+                            )}
+                            style={{ width: `${isRouterOnline ? cpuPct : 0}%` }}
+                          />
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{selectedRouter.name}</span>
+                          <span className="tabular font-medium text-foreground">
+                            {isRouterOnline ? `${cpuPct}% load` : "Unavailable"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. RAM / Memory Usage Gauge */}
+                    <div className="flex items-center gap-3.5 px-4 py-3">
+                      <CircularGauge
+                        percentage={ramPct}
+                        strokeColor={ramThreshold.strokeColor}
+                        unavailable={!isRouterOnline || totalRamMb === null}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                            <HardDrive className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                            RAM / Memory
+                          </span>
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                              isRouterOnline && totalRamMb !== null
+                                ? ramThreshold.badgeClass
+                                : "border-border bg-surface-subtle text-muted-foreground"
+                            )}
+                          >
+                            {isRouterOnline && totalRamMb !== null ? ramThreshold.label : "Unavailable"}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              isRouterOnline && totalRamMb !== null ? ramThreshold.barClass : "bg-border"
+                            )}
+                            style={{ width: `${isRouterOnline && totalRamMb !== null ? ramPct : 0}%` }}
+                          />
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span className="tabular">
+                            {isRouterOnline && totalRamMb !== null && usedRamMb !== null
+                              ? `${usedRamMb.toLocaleString("en-KE")} / ${totalRamMb.toLocaleString("en-KE")} MB used`
+                              : "Memory telemetry unavailable"}
+                          </span>
+                          <span className="tabular font-medium text-foreground">
+                            {isRouterOnline && selectedRouter.freeMemoryMb > 0
+                              ? `${selectedRouter.freeMemoryMb.toLocaleString("en-KE")} MB free`
+                              : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Storage & System Uptime / Identity */}
+                    <div className="grid grid-cols-2 gap-2.5 bg-surface-subtle/50 px-4 py-3 text-xs">
+                      <div className="rounded-md border border-border bg-surface p-2.5">
+                        <div className="text-[11px] font-medium text-muted-foreground">System Uptime</div>
+                        <div className="tabular mt-0.5 font-semibold text-foreground">
+                          {isRouterOnline && selectedRouter.uptime ? selectedRouter.uptime : "Unavailable"}
+                        </div>
+                        <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                          {selectedRouter.wireguardTunnelIp || selectedRouter.managementIp}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-border bg-surface p-2.5">
+                        <div className="text-[11px] font-medium text-muted-foreground">NAND / Disk Storage</div>
+                        <div className="mt-0.5 font-semibold text-muted-foreground">Unavailable</div>
+                        <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                          Not reported by RouterOS API
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()
             )}
           </Panel>
 
-          {/* Recent activity */}
-          <Panel title="Recent activity">
-            {activity.length === 0 ? (
-              <EmptyState
-                icon={Bell}
-                title="No activity yet"
-                description="Payments and network events will appear here."
-                className="py-8"
-              />
-            ) : (
-              <ul className="divide-y divide-border-subtle">
-                {activity.map((a) => (
-                  <li key={a.key} className="flex gap-3 px-4 py-2.5">
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                        a.tone === "success" && "bg-success",
-                        a.tone === "danger" && "bg-danger",
-                        a.tone === "warning" && "bg-warning",
-                        a.tone === "info" && "bg-info"
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium leading-5">{a.title}</div>
-                      <div className="truncate text-xs text-muted-foreground">{a.detail}</div>
+          {/* Network / Interface Status Gauge */}
+          <Panel title="Network & interface status" action={{ href: "/monitoring", label: "Live NOC" }}>
+            {(() => {
+              const rxMbps = sessionsKnown ? stats.currentBandwidthMbps.download : 0;
+              const txMbps = sessionsKnown ? stats.currentBandwidthMbps.upload : 0;
+              const linkCeilingMbps = Math.max(1000, Math.ceil(Math.max(rxMbps, txMbps, 100) / 500) * 500);
+              const rxPct = sessionsKnown ? Math.min(100, Math.round((rxMbps / linkCeilingMbps) * 100)) : 0;
+              const txPct = sessionsKnown ? Math.min(100, Math.round((txMbps / linkCeilingMbps) * 100)) : 0;
+              const totalSessions = sessionsKnown ? stats.onlinePppoe + stats.onlineHotspot : 0;
+              const pppoeShare = totalSessions > 0 ? Math.round((stats.onlinePppoe / totalSessions) * 100) : 0;
+
+              return (
+                <div className="divide-y divide-border-subtle">
+                  {/* RX / TX Interface Throughput Gauges */}
+                  <div className="space-y-3 px-4 py-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <Activity className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                        Aggregate Interface Traffic
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {sessionsKnown ? `${stats.onlineRouters}/${stats.totalRouters} routers reporting` : "Disconnected"}
+                      </span>
                     </div>
-                    <time className="shrink-0 text-xs text-muted-foreground" title={formatShortDate(a.when)}>
-                      {timeAgo(a.when)}
-                    </time>
-                  </li>
-                ))}
-              </ul>
-            )}
+
+                    {!sessionsKnown ? (
+                      <div className="rounded-md border border-border bg-surface-subtle px-3 py-2.5 text-xs text-muted-foreground">
+                        Live RouterOS interface throughput unavailable — router session telemetry is not connected.
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {/* RX Download */}
+                        <div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <ArrowDownToLine className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                              RX / Download
+                            </span>
+                            <span className="tabular font-semibold text-foreground">
+                              {rxMbps.toLocaleString("en-KE")} Mbps
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                            <div
+                              className="h-full rounded-full bg-success transition-all duration-500"
+                              style={{ width: `${Math.max(rxMbps > 0 ? 4 : 0, rxPct)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* TX Upload */}
+                        <div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <ArrowUpFromLine className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                              TX / Upload
+                            </span>
+                            <span className="tabular font-semibold text-foreground">
+                              {txMbps.toLocaleString("en-KE")} Mbps
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-subtle">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all duration-500"
+                              style={{ width: `${Math.max(txMbps > 0 ? 4 : 0, txPct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Sessions Gauge */}
+                  <div className="space-y-2 px-4 py-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground">Active RouterOS Sessions</span>
+                      <span className="tabular font-semibold text-foreground">
+                        {sessionsKnown ? totalSessions.toLocaleString("en-KE") : "Unavailable"}
+                      </span>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-subtle">
+                      {sessionsKnown && totalSessions > 0 && (
+                        <div className="flex h-full w-full">
+                          <div
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ width: `${pppoeShare}%` }}
+                            title={`PPPoE: ${stats.onlinePppoe}`}
+                          />
+                          <div
+                            className="h-full bg-success transition-all duration-500"
+                            style={{ width: `${100 - pppoeShare}%` }}
+                            title={`Hotspot: ${stats.onlineHotspot}`}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                        PPPoE: <strong className="tabular text-foreground">{sessionsKnown ? stats.onlinePppoe : "—"}</strong>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
+                        Hotspot: <strong className="tabular text-foreground">{sessionsKnown ? stats.onlineHotspot : "—"}</strong>
+                      </span>
+                      {selectedRouter && (
+                        <span className="tabular">
+                          Node: <strong className="text-foreground">{selectedRouter.activeSessions}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </Panel>
         </div>
       </div>

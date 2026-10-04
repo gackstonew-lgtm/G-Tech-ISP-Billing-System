@@ -162,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const exitDemoMode = () => {
     deleteCookie(DEMO_COOKIE_NAME);
     setIsDemoMode(false);
-    router.push("/sign-in");
+    router.replace("/");
   };
 
   const signOut = async () => {
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfile(null);
     setOrganization(null);
-    router.push("/sign-in");
+    router.replace("/");
   };
 
   return (

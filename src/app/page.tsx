@@ -58,20 +58,15 @@ import { PricingSection } from "@/components/pricing/PricingSection";
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
-  const [selectedFreeTool, setSelectedFreeTool] =
-    useState<FreeToolId>("speed-test");
+  const [openFreeTool, setOpenFreeTool] = useState<FreeToolId | null>(null);
   const [activeTab, setActiveTab] = useState<"PPPOE" | "HOTSPOT">("PPPOE");
   const { theme, toggleTheme } = useTheme();
   const { enterDemoMode, user } = useAuth();
 
-  const jumpToFreeTool = (toolId: FreeToolId) => {
-    setSelectedFreeTool(toolId);
+  const openFreeToolPopup = (toolId: FreeToolId) => {
+    setOpenFreeTool(toolId);
     setToolsMenuOpen(false);
     setMobileMenuOpen(false);
-    const el = document.getElementById("free-tools");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
   };
 
   return (
@@ -86,28 +81,28 @@ export default function HomePage() {
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center space-x-1 bg-surface px-4 py-1.5 rounded-full border border-border shadow-xs">
+            <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
               <a
                 href="#platform"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Platform
               </a>
               <a
                 href="#how-it-works"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 How It Works
               </a>
               <a
                 href="#features"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Features
               </a>
               <a
                 href="#architecture"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Architecture
               </a>
@@ -123,7 +118,7 @@ export default function HomePage() {
                   aria-expanded={toolsMenuOpen}
                   aria-haspopup="true"
                   onClick={() => setToolsMenuOpen((prev) => !prev)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                   <span>Free Tools</span>
                   <ChevronDown
@@ -138,7 +133,7 @@ export default function HomePage() {
                     <div className="p-2 rounded-2xl bg-surface border border-border shadow-lg space-y-1">
                       <button
                         type="button"
-                        onClick={() => jumpToFreeTool("speed-test")}
+                        onClick={() => openFreeToolPopup("speed-test")}
                         className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
                       >
                         <Activity className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -154,7 +149,7 @@ export default function HomePage() {
 
                       <button
                         type="button"
-                        onClick={() => jumpToFreeTool("what-is-my-ip")}
+                        onClick={() => openFreeToolPopup("what-is-my-ip")}
                         className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
                       >
                         <Globe className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -170,7 +165,7 @@ export default function HomePage() {
 
                       <button
                         type="button"
-                        onClick={() => jumpToFreeTool("bandwidth-calculator")}
+                        onClick={() => openFreeToolPopup("bandwidth-calculator")}
                         className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
                       >
                         <Gauge className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -186,7 +181,7 @@ export default function HomePage() {
 
                       <button
                         type="button"
-                        onClick={() => jumpToFreeTool("subnet-calculator")}
+                        onClick={() => openFreeToolPopup("subnet-calculator")}
                         className="w-full text-left p-2.5 rounded-xl hover:bg-surface-subtle transition-colors flex items-start gap-3 cursor-pointer"
                       >
                         <Network className="w-4 h-4 text-primary shrink-0 mt-0.5" />
@@ -227,14 +222,14 @@ export default function HomePage() {
 
               <a
                 href="#pricing"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Pricing
               </a>
 
               <a
                 href="#comparison"
-                className="px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
               >
                 Why QC NetCore
               </a>
@@ -253,9 +248,8 @@ export default function HomePage() {
               <Link
                 href="/dashboard?demo=true"
                 onClick={enterDemoMode}
-                className="hidden sm:inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 transition-colors"
+                className="hidden sm:inline-flex items-center px-4 py-2 text-xs font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-colors shadow-xs"
               >
-                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                 <span>Explore Demo</span>
               </Link>
 
@@ -340,9 +334,9 @@ export default function HomePage() {
                   enterDemoMode();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-center px-4 py-2.5 text-xs font-bold rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500"
+                className="w-full text-center px-4 py-2.5 text-xs font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-colors shadow-xs"
               >
-                Explore Live Demo
+                Explore Demo
               </Link>
               <Link
                 href="/sign-in"
@@ -407,10 +401,9 @@ export default function HomePage() {
               <Link
                 href="/dashboard?demo=true"
                 onClick={enterDemoMode}
-                className="w-full sm:w-auto px-8 py-3.5 text-sm font-bold text-foreground bg-surface border border-border hover:bg-surface-elevated transition-all duration-200 rounded-xl flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-8 py-3.5 text-sm font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-all duration-200 shadow-xs flex items-center justify-center"
               >
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                <span>Explore Live Demo</span>
+                <span>Explore Demo</span>
               </Link>
             </div>
 
@@ -785,8 +778,8 @@ export default function HomePage() {
 
       {/* FREE TOOLS SECTION */}
       <FreeToolsSection
-        activeTool={selectedFreeTool}
-        onSelectTool={setSelectedFreeTool}
+        openTool={openFreeTool}
+        onOpenToolChange={setOpenFreeTool}
         onEnterDemo={enterDemoMode}
       />
 
@@ -814,10 +807,9 @@ export default function HomePage() {
             <Link
               href="/dashboard?demo=true"
               onClick={enterDemoMode}
-              className="w-full sm:w-auto px-8 py-3.5 text-sm font-bold text-foreground bg-surface-elevated border border-border hover:bg-surface transition-colors rounded-xl flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-3.5 text-sm font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-colors shadow-xs flex items-center justify-center"
             >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Explore Live Demo</span>
+              <span>Explore Demo</span>
             </Link>
           </div>
         </div>

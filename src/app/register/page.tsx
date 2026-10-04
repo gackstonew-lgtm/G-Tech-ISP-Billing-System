@@ -146,9 +146,8 @@ export default function RegisterPage() {
             </button>
             <button
               onClick={enterDemoMode}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 hover:bg-amber-500/20 text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="inline-flex items-center px-4 py-2 text-xs font-bold text-primary-foreground bg-primary rounded-xl hover:bg-primary-hover transition-colors shadow-xs cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" />
               <span>Explore Demo</span>
             </button>
           </div>
