@@ -28,6 +28,7 @@ import {
   buildNotificationDispatch,
   NotificationDispatchLog,
 } from "@/lib/communications/notifier";
+import { formatPhoneForDisplay } from "@/lib/sms/phone";
 
 interface Customer360DrawerProps {
   customer: Customer | null;
@@ -127,7 +128,9 @@ export function Customer360Drawer({
             </h2>
             <p className="text-xs text-muted-foreground">
               {customer.physicalAddress || customer.siteName || "Nairobi Fiber POP"} ·{" "}
-              <span className="font-mono">{customer.phoneNumber}</span>
+              <span className="font-mono font-semibold text-foreground">
+                {formatPhoneForDisplay(customer.phoneNumber)}
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -260,7 +263,19 @@ export function Customer360Drawer({
                 </h3>
                 <dl className="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
                   <div>
-                    <dt className="text-muted-foreground">Subscribed Plan</dt>
+                    <dt className="text-muted-foreground">Phone</dt>
+                    <dd className="mt-0.5 font-mono font-semibold text-foreground">
+                      {formatPhoneForDisplay(customer.phoneNumber)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Service</dt>
+                    <dd className="mt-0.5 font-semibold text-foreground">
+                      {dossier.pppoe ? "PPPoE" : "Hotspot"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Package</dt>
                     <dd className="mt-0.5 font-semibold text-foreground">
                       {dossier.subscription?.planName || "Silver Fiber - 10 Mbps"}
                     </dd>

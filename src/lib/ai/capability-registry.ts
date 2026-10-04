@@ -307,6 +307,57 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "billing cycle",
     ],
   },
+  {
+    id: "sms-communications",
+    featureName: "SMS Communications, Bulk Campaigns & E.164 Phone Management",
+    module: "Communications & Notifications",
+    route: "/sms",
+    apiEndpoints: ["/api/v1/sms", "/api/v1/sms/webhook", "/api/v1/settings/phone"],
+    description:
+      "Tenant-isolated SMS communication system for sending individual, targeted, and bulk SMS notifications, managing templates, tracking carrier delivery reports, and normalizing subscriber phone numbers.",
+    whyItExists:
+      "Enables ISPs to send payment receipts, overdue reminders, expiry alerts, outage announcements, and package upgrade campaigns using verified E.164 subscriber phone numbers.",
+    howItWorks: [
+      "Phone numbers collected at registration or in subscriber profiles are validated and normalized to canonical E.164 format (`+2547XXXXXXXX`).",
+      "Operators compose individual or targeted bulk SMS on `/sms` by filtering subscribers by status, package, overdue balance, or POP/Router.",
+      "Personalization variables (`{{customer_name}}`, `{{package_name}}`, `{{expiry_date}}`, `{{amount_due}}`, `{{paybill_number}}`) are resolved from live customer records before dispatch.",
+      "Bulk SMS requires `sms.send_bulk` permission and explicit confirmation before transmission.",
+    ],
+    availableActions: [
+      "Send individual, targeted, or bulk SMS (`/sms`)",
+      "Manage approved SMS templates and automated triggers (`/sms` → Templates)",
+      "Configure Africa's Talking or Twilio SMS gateway (`/sms` → Gateway Settings)",
+      "Update and verify account phone number (`/settings` → Account & session)",
+    ],
+    requiredPermissions: [
+      "sms.view",
+      "sms.send",
+      "sms.send_bulk",
+      "sms.manage_templates",
+      "sms.manage_provider",
+      "sms.view_history",
+      "sms.view_usage",
+    ],
+    authoritativeDataSources: [
+      "customers",
+      "profiles",
+      "sms_messages",
+      "sms_campaigns",
+      "sms_templates",
+      "sms_provider_configs",
+    ],
+    dependencies: ["Africa's Talking / Twilio SMS Gateway", "Customer E.164 Phone Directory"],
+    configurationRequirements: [
+      "Connect an SMS gateway provider (`AFRICAS_TALKING` or `TWILIO`) in `/sms` → Gateway Settings.",
+    ],
+    keywords: [
+      "how do i send sms",
+      "where do i send bulk sms",
+      "sms template",
+      "configure sms provider",
+      "change phone number",
+    ],
+  },
 ];
 
 export function findMatchingCapabilities(query: string): FeatureCapabilityDefinition[] {

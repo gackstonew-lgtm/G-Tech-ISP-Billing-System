@@ -47,6 +47,15 @@ import {
   type FeatureCapabilityDefinition,
 } from "./capability-registry.ts";
 import {
+  getSmsOverviewMetrics,
+  getSmsHistory,
+  buildEnrichedSmsRecipients,
+  previewSmsCampaign,
+  DEFAULT_SMS_TEMPLATES,
+  type SmsRecipientMode,
+  type SmsCategory,
+} from "../sms/engine.ts";
+import {
   SEED_ORGANIZATION,
   SEED_CUSTOMERS,
   SEED_PPPOE,
@@ -1559,6 +1568,77 @@ export class CopilotToolkit {
       "system_capability_registry",
       () =>
         query ? findMatchingCapabilities(query) : SYSTEM_CAPABILITY_REGISTRY
+    );
+  }
+
+  /**
+   * SMS Communications Intelligence & Metrics Tool
+   */
+  getSmsMetrics() {
+    return this.guard(
+      "getSmsMetrics",
+      "sms.view",
+      "sms_messages + sms_campaigns + customers + sms_provider_configs",
+      () => {
+        const isDemo = this.ctx.environmentMode === "DEMO_DATA";
+        const metrics = getSmsOverviewMetrics(
+          this.ctx.organizationId,
+          this.raw,
+          isDemo
+        );
+        const recentMessages = getSmsHistory(
+          this.ctx.organizationId,
+          undefined,
+          isDemo
+        );
+        const recipients = buildEnrichedSmsRecipients(
+          this.ctx.organizationId,
+          this.raw
+        );
+
+        return {
+          metrics,
+          recentMessages: recentMessages.slice(0, 15),
+          recipients,
+          paymentReminderSentCount: metrics.paymentRemindersThisMonth,
+          overdueWithoutReminder: metrics.unremindedOverdueCustomers,
+        };
+      }
+    );
+  }
+
+  /**
+   * Confirmation-gated SMS Campaign Preview Tool (never dispatches SMS directly)
+   */
+  previewSmsCampaignTool(options: {
+    recipientMode: SmsRecipientMode;
+    messageTemplate?: string;
+    category?: SmsCategory;
+    packageName?: string;
+  }) {
+    const requiredPerm: Permission =
+      options.recipientMode === "INDIVIDUAL" ? "sms.send" : "sms.send_bulk";
+    return this.guard(
+      "previewSmsCampaignTool",
+      requiredPerm,
+      "customers + sms_templates + sms_campaigns",
+      () => {
+        const defaultTemplate =
+          DEFAULT_SMS_TEMPLATES.find((t) => t.code === "PAYMENT_REMINDER") ||
+          DEFAULT_SMS_TEMPLATES[0];
+        const body = options.messageTemplate || defaultTemplate.bodyTemplate;
+        return previewSmsCampaign({
+          organizationId: this.ctx.organizationId,
+          recipientMode: options.recipientMode,
+          category: options.category || defaultTemplate.category,
+          messageTemplate: body,
+          filters: options.packageName
+            ? { packageName: options.packageName }
+            : undefined,
+          data: this.raw,
+          isDemoMode: this.ctx.environmentMode === "DEMO_DATA",
+        });
+      }
     );
   }
 

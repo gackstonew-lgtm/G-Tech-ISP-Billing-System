@@ -42,6 +42,7 @@ import {
 import { cn, formatShortDate } from "@/lib/utils";
 import type { OrganizationRow } from "@/types/database.types";
 import { SocAndGovernancePanels } from "@/components/settings/SocAndGovernancePanels";
+import { AccountPhoneSettingsCard } from "@/components/settings/AccountPhoneSettingsCard";
 
 interface SettingsFormState {
   name: string;
@@ -836,6 +837,8 @@ export default function SettingsPage() {
                   <div className="truncate text-muted-foreground">{user.email}</div>
                 )}
               </div>
+
+              <AccountPhoneSettingsCard />
 
               <div className="flex flex-col gap-2 pt-1">
                 {!isDemoResponse && (

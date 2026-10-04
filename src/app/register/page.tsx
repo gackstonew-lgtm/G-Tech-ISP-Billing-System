@@ -3,12 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, User, Building, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, User, Building, Phone, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { classifyAuthError, sanitizeUserMessage } from "@/lib/supabase/errors";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
+import { validateAndNormalizePhone } from "@/lib/sms/phone";
 
 export default function RegisterPage() {
   const [activeTab, setActiveTab] = useState<"SIGN_IN" | "REGISTER">("REGISTER");
@@ -21,6 +22,7 @@ export default function RegisterPage() {
   // Register State
   const [fullName, setFullName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,6 +70,12 @@ export default function RegisterPage() {
     setError(null);
     setSuccessMsg(null);
 
+    const phoneCheck = validateAndNormalizePhone(phoneNumber);
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || "Please enter a valid phone number (e.g. 0712052104 or +254712052104).");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match. Please verify your password.");
       return;
@@ -87,6 +95,7 @@ export default function RegisterPage() {
         body: JSON.stringify({
           fullName,
           organizationName,
+          phoneNumber: phoneCheck.normalizedPhoneNumber,
           email,
           password,
         }),
@@ -246,6 +255,23 @@ export default function RegisterPage() {
                       value={organizationName}
                       onChange={(e) => setOrganizationName(e.target.value)}
                       placeholder="Organization name"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      required
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="0712052104 or +254712052104"
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
                     />
                   </div>

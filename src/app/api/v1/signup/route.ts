@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { classifyAuthError } from "@/lib/supabase/errors";
+import { validateAndNormalizePhone } from "@/lib/sms/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +18,29 @@ function slugify(text: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { fullName, email, password, organizationName } = body;
+    const { fullName, email, password, organizationName, phoneNumber, phone } = body;
+    const rawPhone = phoneNumber ?? phone ?? "";
 
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !rawPhone) {
       return NextResponse.json(
         {
           success: false,
           code: "VALIDATION_ERROR",
-          message: "Full name, email, and password are required.",
-          error: "Full name, email, and password are required.",
+          message: "Full name, phone number, email, and password are required.",
+          error: "Full name, phone number, email, and password are required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const phoneValidation = validateAndNormalizePhone(rawPhone);
+    if (!phoneValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "VALIDATION_ERROR",
+          message: phoneValidation.error || "Please enter a valid phone number.",
+          error: phoneValidation.error || "Please enter a valid phone number.",
         },
         { status: 400 }
       );
@@ -45,6 +60,7 @@ export async function POST(req: NextRequest) {
 
     const orgName = organizationName?.trim() || `${fullName}'s ISP`;
     const orgSlug = `${slugify(orgName)}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const normalizedPhone = phoneValidation.normalizedPhoneNumber;
 
     const supabaseAdmin = createSupabaseServiceClient();
 
@@ -56,6 +72,9 @@ export async function POST(req: NextRequest) {
       user_metadata: {
         full_name: fullName,
         organization_name: orgName,
+        phone_number: normalizedPhone,
+        normalized_phone_number: normalizedPhone,
+        country_code: phoneValidation.countryCode,
       },
     });
 
@@ -77,14 +96,14 @@ export async function POST(req: NextRequest) {
 
     const userId = authData.user.id;
 
-    // 2. Create organization in DB
+    // 2. Create organization in DB with normalized phone number
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
       .insert({
         name: orgName,
         slug: orgSlug,
         email,
-        phone: "+254700000000",
+        phone: normalizedPhone,
         currency: "KES",
         timezone: "Africa/Nairobi",
         billing_cycle_type: "ANNIVERSARY",
@@ -102,13 +121,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Create user profile in DB
+    // 3. Create user profile in DB with normalized phone_number
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .insert({
         id: userId,
         organization_id: org.id,
         full_name: fullName,
+        phone_number: normalizedPhone,
         role: "isp_owner",
         is_active: true,
       });
@@ -129,6 +149,8 @@ export async function POST(req: NextRequest) {
           id: userId,
           email,
           fullName,
+          phoneNumber: normalizedPhone,
+          countryCode: phoneValidation.countryCode,
           organizationId: org.id,
         },
       },

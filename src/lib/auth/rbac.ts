@@ -31,7 +31,14 @@ export type Permission =
   | "soc.view"
   | "audit.view"
   | "copilot.use"
-  | "portal.access";
+  | "portal.access"
+  | "sms.view"
+  | "sms.send"
+  | "sms.send_bulk"
+  | "sms.manage_templates"
+  | "sms.manage_provider"
+  | "sms.view_history"
+  | "sms.view_usage";
 
 const ALL_STAFF_PERMISSIONS: Permission[] = [
   "org.manage",
@@ -65,6 +72,13 @@ const ALL_STAFF_PERMISSIONS: Permission[] = [
   "audit.view",
   "copilot.use",
   "portal.access",
+  "sms.view",
+  "sms.send",
+  "sms.send_bulk",
+  "sms.manage_templates",
+  "sms.manage_provider",
+  "sms.view_history",
+  "sms.view_usage",
 ];
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -99,6 +113,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "soc.view",
     "audit.view",
     "copilot.use",
+    "sms.view",
+    "sms.send",
+    "sms.send_bulk",
+    "sms.manage_templates",
+    "sms.manage_provider",
+    "sms.view_history",
+    "sms.view_usage",
   ],
   noc_engineer: [
     "routers.view",
@@ -115,6 +136,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "automation.manage",
     "soc.view",
     "copilot.use",
+    "sms.view",
+    "sms.send",
+    "sms.send_bulk",
+    "sms.view_history",
   ],
   finance: [
     "customers.view",
@@ -130,6 +155,11 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "noc.view",
     "audit.view",
     "copilot.use",
+    "sms.view",
+    "sms.send",
+    "sms.send_bulk",
+    "sms.view_history",
+    "sms.view_usage",
   ],
   support: [
     "customers.view",
@@ -144,6 +174,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "work_orders.update",
     "noc.view",
     "copilot.use",
+    "sms.view",
+    "sms.send",
+    "sms.view_history",
   ],
   technician: [
     "customers.view",
@@ -155,6 +188,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "inventory.manage",
     "gis.manage",
     "copilot.use",
+    "sms.view",
   ],
   agent: [
     "customers.view",
@@ -163,6 +197,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "vouchers.view",
     "vouchers.generate",
     "billing.view",
+    "sms.view",
   ],
   reseller: [
     "customers.view",
@@ -171,6 +206,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "vouchers.view",
     "vouchers.generate",
     "billing.view",
+    "sms.view",
   ],
   auditor: [
     "routers.view",
@@ -183,6 +219,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "noc.view",
     "soc.view",
     "audit.view",
+    "sms.view",
+    "sms.view_history",
+    "sms.view_usage",
   ],
   customer: [
     "portal.access",

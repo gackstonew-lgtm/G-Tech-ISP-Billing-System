@@ -87,6 +87,8 @@ export type CopilotIntent =
   | "NETWORK_AND_OUTAGE_STATUS"
   | "ROUTER_SESSIONS_AND_HEALTH"
   | "BUSINESS_PERFORMANCE_SUMMARY"
+  | "SMS_COMMUNICATIONS_QUERY"
+  | "SMS_CAMPAIGN_PROPOSAL"
   | "FEATURE_AND_NAVIGATION_GUIDE"
   | "AMBIGUOUS_QUERY_CLARIFICATION"
   | "SECURITY_POLICY_REFUSAL"
@@ -561,6 +563,177 @@ export function executeCopilotIntelligence(params: {
         },
       ],
       proposedActions: [],
+    });
+  }
+
+  // ==========================================================================
+  // ==========================================================================
+  // 2.5 SMS COMMUNICATIONS INTELLIGENCE & CONFIRMATION-GATED CAMPAIGNS
+  // ==========================================================================
+  if (
+    /\b(sms|payment reminder|payment reminders|valid phone|phone numbers|can receive sms)\b/i.test(
+      q
+    ) &&
+    !/\b(how does|how do i|where do i|where can i|explain|configure)\b/i.test(q)
+  ) {
+    // A. Confirmation-gated bulk SMS campaign request ("Send a payment reminder to customers with overdue balances")
+    if (/\b(send|dispatch|broadcast|notify|trigger)\b/i.test(q)) {
+      const recipientMode = /\bsuspended\b/i.test(q)
+        ? "SUSPENDED_SUBSCRIBERS"
+        : /\bexpiring\b/i.test(q)
+        ? "EXPIRING_SUBSCRIBERS"
+        : /\bactive\b/i.test(q)
+        ? "ACTIVE_SUBSCRIBERS"
+        : "OVERDUE_CUSTOMERS";
+
+      const previewRes = toolkit.previewSmsCampaignTool({
+        recipientMode,
+        category: "TRANSACTIONAL",
+      });
+
+      if (!previewRes.ok || !previewRes.data) {
+        return finalize({
+          intent: "PERMISSION_DENIED",
+          headline: "Permission Required for Bulk SMS",
+          answerMarkdown:
+            previewRes.message ||
+            "You do not have permission (`sms.send_bulk`) to prepare or send bulk SMS campaigns.",
+          metricsCited: [],
+          proposedActions: [],
+        });
+      }
+
+      const p = previewRes.data;
+      const recipientLines = p.samplePreviews
+        .map(
+          (r) =>
+            `- **${r.customerName}** (\`${r.accountNumber}\`) · Phone: \`${r.phone}\` · Package: ${r.packageName}`
+        )
+        .join("\n");
+
+      return finalize({
+        intent: "SMS_CAMPAIGN_PROPOSAL",
+        headline: `Confirmation Required — Payment Reminder SMS Campaign (${p.recipientCount} Eligible Recipient(s))`,
+        answerMarkdown: `I have prepared a **Payment Reminder SMS Campaign** targeting **${recipientMode}** in **${ctx.organizationName}**. **No SMS messages have been sent yet** — explicit operator confirmation is required before bulk dispatch.\n\n### Campaign Summary\n- **Target Group:** \`${recipientMode}\`\n- **Eligible Recipients:** **${p.recipientCount}** subscriber(s) with verified E.164 phone numbers\n- **Skipped (Invalid/Opt-Out):** **${p.skippedInvalidCount + p.skippedOptOutCount}**\n- **Encoding & Segments:** \`${p.encoding}\` (**${p.estimatedTotalSegments}** total SMS segments)\n- **Gateway Status:** ${p.providerStatusMessage}\n\n### Sample Eligible Recipients\n${recipientLines || "No eligible recipients matched."}\n\n### Sample Personalized Preview\n> ${p.samplePreviews[0]?.resolvedMessage || "No preview available"}`,
+        metricsCited: [
+          { label: "Eligible Recipients", value: String(p.recipientCount) },
+          {
+            label: "Excluded",
+            value: String(p.skippedInvalidCount + p.skippedOptOutCount),
+          },
+          { label: "Total Segments", value: String(p.estimatedTotalSegments) },
+          { label: "Encoding", value: p.encoding },
+        ],
+        proposedActions: [
+          {
+            actionId: "act-confirm-bulk-sms-overdue",
+            label: `Confirm & Send Payment Reminder SMS to ${p.recipientCount} Customer(s)`,
+            permissionRequired: "sms.send_bulk",
+            requiresConfirmation: true,
+            commandPreview: `POST /api/v1/sms { action: "send", recipientMode: "${recipientMode}", confirmed: true, recipients: ${p.recipientCount} }`,
+          },
+        ],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+
+    // B. Informational SMS & Phone Reachability Queries
+    const smsRes = toolkit.getSmsMetrics();
+    if (!smsRes.ok || !smsRes.data) {
+      return finalize({
+        intent: "PERMISSION_DENIED",
+        headline: "Permission Required",
+        answerMarkdown:
+          smsRes.message || "You don't have permission (`sms.view`) to view SMS communications.",
+        metricsCited: [],
+        proposedActions: [],
+      });
+    }
+
+    const {
+      metrics,
+      recipients,
+      paymentReminderSentCount,
+      overdueWithoutReminder,
+    } = smsRes.data;
+
+    // "Which customers have not received their payment reminder?"
+    if (/\b(not received|haven't received|without|missing)\b/i.test(q) && /\b(reminder)\b/i.test(q)) {
+      const listMd =
+        overdueWithoutReminder.length === 0
+          ? "All customers with overdue balances have already received a payment reminder SMS."
+          : overdueWithoutReminder
+              .map(
+                (r) =>
+                  `- **${r.customerName}** (\`${r.accountNumber}\`) · Phone: \`${r.phone}\` · Balance: **${ctx.currency} ${r.balanceDue.toLocaleString()}** · Package: ${r.packageName}`
+              )
+              .join("\n");
+
+      return finalize({
+        intent: "SMS_COMMUNICATIONS_QUERY",
+        headline: `Overdue Customers Pending Payment Reminder (${overdueWithoutReminder.length})`,
+        answerMarkdown: `Found **${overdueWithoutReminder.length}** customer(s) with overdue balances who have not yet received a payment reminder SMS:\n\n${listMd}`,
+        metricsCited: [
+          {
+            label: "Pending Reminder",
+            value: String(overdueWithoutReminder.length),
+          },
+          {
+            label: "Reminders Sent",
+            value: String(paymentReminderSentCount),
+          },
+        ],
+        proposedActions:
+          overdueWithoutReminder.length > 0
+            ? [
+                {
+                  actionId: "act-send-missing-reminders",
+                  label: `Prepare Payment Reminder SMS for ${overdueWithoutReminder.length} Overdue Customer(s)`,
+                  permissionRequired: "sms.send_bulk",
+                  requiresConfirmation: true,
+                  commandPreview: `POST /api/v1/sms { action: "preview", recipientMode: "OVERDUE_CUSTOMERS" }`,
+                },
+              ]
+            : [],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+
+    // Default SMS & Phone Reachability Summary
+    const validCustomersList = recipients
+      .filter((r) => r.phoneValid)
+      .slice(0, 6)
+      .map(
+        (r) =>
+          `- **${r.customerName}** (\`${r.accountNumber}\`) — \`${r.formattedPhone}\` (${r.status})`
+      )
+      .join("\n");
+
+    const missingOrInvalidCount =
+      metrics.totalCustomers - metrics.customersWithValidPhone;
+    const optedOutMarketingCount =
+      metrics.customersWithValidPhone - metrics.customersReachableMarketing;
+
+    return finalize({
+      intent: "SMS_COMMUNICATIONS_QUERY",
+      headline: `SMS Communications & Customer Phone Reachability Summary`,
+      answerMarkdown: `- **Customers with Valid Phone Numbers (SMS Reachable):** **${metrics.customersWithValidPhone}** of **${metrics.totalCustomers}** total subscribers (**${missingOrInvalidCount}** missing/invalid)
+- **Marketing Opt-In Subscribers:** **${metrics.customersReachableMarketing}** (**${optedOutMarketingCount}** opted out of promotional SMS)
+- **SMS Sent Today (24h):** **${metrics.messagesSentToday}** message(s)
+- **SMS Sent This Month (30d):** **${metrics.messagesSentThisMonth}** message(s) (**${paymentReminderSentCount}** payment/suspension reminder(s))
+- **Delivery Breakdown:** **${metrics.deliveredCount}** Delivered · **${metrics.pendingCount}** Sent/Pending · **${metrics.failedCount}** Failed (${metrics.deliveryRatePercent}% delivery rate)
+- **SMS Gateway Status:** **${metrics.providerName}** — ${metrics.statusMessage}\n\n### Verified Subscriber Phone Directory (Sample)\n${validCustomersList}`,
+      metricsCited: [
+        {
+          label: "SMS Reachable",
+          value: `${metrics.customersWithValidPhone}/${metrics.totalCustomers}`,
+        },
+        { label: "Sent Today", value: String(metrics.messagesSentToday) },
+        { label: "Sent This Month", value: String(metrics.messagesSentThisMonth) },
+        { label: "Payment Reminders", value: String(paymentReminderSentCount) },
+      ],
+      proposedActions: [],
+      confidenceLevel: "CONFIRMED",
     });
   }
 

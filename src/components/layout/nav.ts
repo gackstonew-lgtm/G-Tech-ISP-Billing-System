@@ -11,6 +11,7 @@ import {
   Wifi,
   Settings,
   Paintbrush,
+  MessageSquare,
 } from "lucide-react";
 
 /**
@@ -42,6 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/customers", label: "Subscribers", icon: Users, keywords: "customers pppoe accounts" },
       { href: "/technicians", label: "Field Operations", icon: Wrench, keywords: "technicians work orders installs" },
+      { href: "/sms", label: "SMS", icon: MessageSquare, keywords: "sms communications bulk messages templates notifications phone" },
     ],
   },
   {
