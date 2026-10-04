@@ -889,48 +889,28 @@ interface TenantSmsState {
 const TENANT_SMS_STORE = new Map<string, TenantSmsState>();
 
 function detectEnvSmsProvider(orgId: string, isDemoMode = false): SmsProviderServerConfig {
-  const atApiKey = process.env.AFRICASTALKING_API_KEY;
-  const atUsername = process.env.AFRICASTALKING_USERNAME;
-  const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (atApiKey && atUsername) {
-    return {
-      organizationId: orgId,
-      provider: "AFRICAS_TALKING",
-      senderId: process.env.AFRICASTALKING_SENDER_ID || "QCNetCore",
-      username: atUsername,
-      apiKey: atApiKey,
-      environment: atUsername === "sandbox" ? "SANDBOX" : "PRODUCTION",
-      isEnabled: true,
-      costPerSegment: 0.8,
-      currency: "KES",
-      cachedBalance: 4200,
-      cachedCredits: 5250,
-      webhookUrl: "/api/v1/sms/webhook",
-      updatedAt: new Date().toISOString(),
-    };
-  }
-
-  if (twilioSid && twilioToken) {
-    return {
-      organizationId: orgId,
-      provider: "TWILIO",
-      senderId: process.env.TWILIO_SENDER_ID || "QCNetCore",
-      accountSid: twilioSid,
-      apiSecret: twilioToken,
-      environment: "PRODUCTION",
-      isEnabled: true,
-      costPerSegment: 1.2,
-      currency: "KES",
-      cachedBalance: 6000,
-      cachedCredits: 5000,
-      webhookUrl: "/api/v1/sms/webhook",
-      updatedAt: new Date().toISOString(),
-    };
-  }
-
   if (isDemoMode) {
+    const atApiKey = process.env.AFRICASTALKING_API_KEY;
+    const atUsername = process.env.AFRICASTALKING_USERNAME;
+
+    if (atApiKey && atUsername) {
+      return {
+        organizationId: orgId,
+        provider: "AFRICAS_TALKING",
+        senderId: process.env.AFRICASTALKING_SENDER_ID || "QCNetCore",
+        username: atUsername,
+        apiKey: atApiKey,
+        environment: atUsername === "sandbox" ? "SANDBOX" : "PRODUCTION",
+        isEnabled: true,
+        costPerSegment: 0.8,
+        currency: "KES",
+        cachedBalance: 4200,
+        cachedCredits: 5250,
+        webhookUrl: "/api/v1/sms/webhook",
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
     // In Demo Mode, provide a pre-configured Africa's Talking sandbox adapter so
     // operators exploring the live demo can test individual & bulk SMS workflows,
     // while also allowing them to toggle provider configuration state.
@@ -956,7 +936,7 @@ function detectEnvSmsProvider(orgId: string, isDemoMode = false): SmsProviderSer
   return {
     organizationId: orgId,
     provider: "UNCONFIGURED",
-    senderId: "QCNetCore",
+    senderId: "—",
     environment: "PRODUCTION",
     isEnabled: false,
     costPerSegment: null,
@@ -1108,7 +1088,17 @@ export function getOrCreateTenantSmsState(
   isDemoMode = false
 ): TenantSmsState {
   const existing = TENANT_SMS_STORE.get(organizationId);
-  if (existing) return existing;
+  if (existing) {
+    if (
+      !isDemoMode &&
+      organizationId !== SEED_ORGANIZATION.id &&
+      existing.providerConfig.cachedCredits === 5250 &&
+      existing.providerConfig.cachedBalance === 4200
+    ) {
+      existing.providerConfig = detectEnvSmsProvider(organizationId, false);
+    }
+    return existing;
+  }
 
   const initialMessages =
     organizationId === SEED_ORGANIZATION.id
@@ -1301,9 +1291,15 @@ export function updateTenantSmsProviderConfig(params: {
         ? params.costPerSegment
         : prev.costPerSegment ?? 0.8,
     cachedBalance:
-      params.provider === "UNCONFIGURED" ? null : prev.cachedBalance ?? 3840,
+      params.provider === "UNCONFIGURED"
+        ? null
+        : prev.cachedBalance ??
+          (params.organizationId === SEED_ORGANIZATION.id ? 3840 : null),
     cachedCredits:
-      params.provider === "UNCONFIGURED" ? null : prev.cachedCredits ?? 4800,
+      params.provider === "UNCONFIGURED"
+        ? null
+        : prev.cachedCredits ??
+          (params.organizationId === SEED_ORGANIZATION.id ? 4800 : null),
     updatedAt: new Date().toISOString(),
   };
 

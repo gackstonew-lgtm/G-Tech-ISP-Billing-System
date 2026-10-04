@@ -14,7 +14,6 @@ import { SEED_WORK_ORDERS } from "@/lib/db/mock-db";
 import { WorkOrder, WorkOrderStatus } from "@/types";
 import { GlassCard, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
-import { FieldInventoryAndSlaPanels } from "@/components/technicians/FieldInventoryAndSlaPanels";
 import { useAuth } from "@/lib/auth/auth-context";
 
 export default function TechniciansPage() {
@@ -173,8 +172,6 @@ export default function TechniciansPage() {
           ))}
         </div>
       )}
-
-      <FieldInventoryAndSlaPanels />
 
       {/* New Work Order Modal */}
       {isModalOpen && (

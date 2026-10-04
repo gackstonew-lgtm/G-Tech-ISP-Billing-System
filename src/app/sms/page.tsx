@@ -247,15 +247,15 @@ export default function SmsPage() {
   // Provider Config state
   const [cfgProvider, setCfgProvider] =
     useState<SmsProviderType>("AFRICAS_TALKING");
-  const [cfgSenderId, setCfgSenderId] = useState("QCNetCore");
+  const [cfgSenderId, setCfgSenderId] = useState("");
   const [cfgUsername, setCfgUsername] = useState("");
   const [cfgAccountSid, setCfgAccountSid] = useState("");
   const [cfgApiKey, setCfgApiKey] = useState("");
   const [cfgApiSecret, setCfgApiSecret] = useState("");
   const [cfgEnvironment, setCfgEnvironment] =
-    useState<SmsEnvironmentType>("SANDBOX");
-  const [cfgCostPerSegment, setCfgCostPerSegment] = useState("0.80");
-  const [cfgEnabled, setCfgEnabled] = useState(true);
+    useState<SmsEnvironmentType>("PRODUCTION");
+  const [cfgCostPerSegment, setCfgCostPerSegment] = useState("");
+  const [cfgEnabled, setCfgEnabled] = useState(false);
 
   const loadSmsData = useCallback(async () => {
     setLoadError(null);
@@ -284,17 +284,25 @@ export default function SmsPage() {
       if (d.permissions) setPermissions(d.permissions);
 
       if (d.provider) {
-        setCfgProvider(d.provider.provider);
-        setCfgSenderId(d.provider.senderId || "QCNetCore");
+        setCfgProvider(
+          d.provider.provider === "UNCONFIGURED"
+            ? "AFRICAS_TALKING"
+            : d.provider.provider
+        );
+        setCfgSenderId(
+          d.provider.senderId && d.provider.senderId !== "—"
+            ? d.provider.senderId
+            : ""
+        );
         setCfgUsername(d.provider.username || "");
         setCfgAccountSid(d.provider.accountSid || "");
         setCfgApiKey(d.provider.hasApiKey ? "••••••••" : "");
         setCfgApiSecret(d.provider.hasApiSecret ? "••••••••" : "");
-        setCfgEnvironment(d.provider.environment || "SANDBOX");
+        setCfgEnvironment(d.provider.environment || "PRODUCTION");
         setCfgCostPerSegment(
           d.provider.costPerSegment !== null
             ? String(d.provider.costPerSegment)
-            : "0.80"
+            : ""
         );
         setCfgEnabled(Boolean(d.provider.isEnabled));
       }
