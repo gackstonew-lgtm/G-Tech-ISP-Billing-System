@@ -54,6 +54,7 @@ import {
   type FreeToolId,
 } from "@/components/tools/FreeToolsSection";
 import { PricingSection } from "@/components/pricing/PricingSection";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -815,24 +816,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="py-10 bg-background border-t border-border text-xs text-muted-foreground">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <NexaNetLogo variant="horizontal" />
-          </div>
-          <div>
-            &copy; {new Date().getFullYear()} QC NetCore. All rights reserved. ISP Network &amp; Billing Platform.
-          </div>
-          <div className="flex items-center space-x-4">
-            <a href="#free-tools" className="hover:text-foreground">Free Tools</a>
-            <a href="#pricing" className="hover:text-foreground">Pricing</a>
-            <Link href="/sign-in" className="hover:text-foreground">Sign In</Link>
-            <Link href="/register" className="hover:text-foreground">Register</Link>
-            <Link href="/dashboard?demo=true" onClick={enterDemoMode} className="hover:text-foreground">Demo</Link>
-          </div>
-        </div>
-      </footer>
+      {/* COMPREHENSIVE FOOTER */}
+      <SiteFooter onEnterDemo={enterDemoMode} />
     </div>
   );
 }
