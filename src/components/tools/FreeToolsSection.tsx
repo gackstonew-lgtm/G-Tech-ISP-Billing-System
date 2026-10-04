@@ -13,6 +13,11 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+import {
+  ScrollReveal,
+  StaggerContainer,
+  StaggerItem,
+} from "@/components/ui/ScrollReveal";
 
 const SpeedTestTool = dynamic(
   () => import("./SpeedTestTool").then((m) => m.SpeedTestTool),
@@ -142,7 +147,10 @@ export function FreeToolsSection({
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-3">
+        <ScrollReveal
+          variant="fade-up"
+          className="text-center max-w-3xl mx-auto space-y-3"
+        >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
             <Wrench className="w-3.5 h-3.5" />
             <span>Free Tools</span>
@@ -153,78 +161,84 @@ export function FreeToolsSection({
           <p className="text-sm sm:text-base text-muted-foreground">
             Run live diagnostics, inspect public routing, size upstream capacity, calculate IPv4 subnets, or explore the pre-populated QC NetCore operator workspace.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* 5 Free Tool Trigger Cards (Open as Screen Popup on Click) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {INTERACTIVE_TOOLS.map((tool) => {
+        <StaggerContainer
+          staggerMs={75}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+        >
+          {INTERACTIVE_TOOLS.map((tool, idx) => {
             const Icon = tool.icon;
             return (
-              <button
-                key={tool.id}
-                type="button"
-                aria-haspopup="dialog"
-                onClick={() => setModalTool(tool.id)}
-                className="text-left p-5 rounded-2xl bg-surface hover:bg-surface-subtle border border-border hover:border-primary/50 transition-all duration-200 flex flex-col justify-between gap-4 group cursor-pointer shadow-xs"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Icon className="w-5 h-5" />
+              <StaggerItem key={tool.id} index={idx} variant="metric-card">
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setModalTool(tool.id)}
+                  className="w-full h-full text-left p-5 rounded-2xl bg-surface hover:bg-surface-subtle border border-border hover:border-primary/50 hover:-translate-y-1 hover:shadow-md active:scale-[0.99] transition-all duration-200 flex flex-col justify-between gap-4 group cursor-pointer shadow-xs"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200">
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-subtle text-muted-foreground border border-border group-hover:border-primary/30 group-hover:text-primary transition-colors">
+                        Open Tool
+                      </span>
                     </div>
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-subtle text-muted-foreground border border-border group-hover:border-primary/30 group-hover:text-primary transition-colors">
-                      Open Tool
-                    </span>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-foreground group-hover:text-primary transition-colors">
+                        {tool.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {tool.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-foreground group-hover:text-primary transition-colors">
-                      {tool.title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      {tool.description}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-1 text-xs font-bold text-primary">
-                  <span>Launch popup</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </div>
-              </button>
+                  <div className="flex items-center gap-1 text-xs font-bold text-primary">
+                    <span>Launch popup</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </div>
+                </button>
+              </StaggerItem>
             );
           })}
 
           {/* 5th Card: Live Demo */}
-          <Link
-            href="/dashboard?demo=true"
-            onClick={onEnterDemo}
-            className="text-left p-5 rounded-2xl bg-surface hover:bg-surface-subtle border border-border hover:border-primary/50 transition-all duration-200 flex flex-col justify-between gap-4 group shadow-xs"
-          >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                  <Sparkles className="w-5 h-5" />
+          <StaggerItem index={4} variant="metric-card">
+            <Link
+              href="/dashboard?demo=true"
+              onClick={onEnterDemo}
+              className="w-full h-full text-left p-5 rounded-2xl bg-surface hover:bg-surface-subtle border border-border hover:border-primary/50 hover:-translate-y-1 hover:shadow-md active:scale-[0.99] transition-all duration-200 flex flex-col justify-between gap-4 group shadow-xs"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-105 transition-all duration-200">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-subtle text-muted-foreground border border-border group-hover:border-primary/30 group-hover:text-primary transition-colors">
+                    Operator App
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-subtle text-muted-foreground border border-border group-hover:border-primary/30 group-hover:text-primary transition-colors">
-                  Operator App
-                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-foreground group-hover:text-primary transition-colors">
+                    Live Demo
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    The operator app, already filled with data
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-sm text-foreground group-hover:text-primary transition-colors">
-                  Live Demo
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  The operator app, already filled with data
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-1 text-xs font-bold text-primary">
-              <span>Open operator demo</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </div>
-          </Link>
-        </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-primary">
+                <span>Open operator demo</span>
+                <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
+            </Link>
+          </StaggerItem>
+        </StaggerContainer>
       </div>
 
       {/* Screen-Level Tool Popup / Modal Overlay */}

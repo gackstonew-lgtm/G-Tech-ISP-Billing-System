@@ -302,11 +302,50 @@ button, input, select, textarea {
   animation: qc-junction-blink 3.2s ease-in-out infinite;
 }
 
+/* Subtle enterprise floating motion (desktop only, 0px -> -5px -> 0px) */
+@keyframes qc-float-subtle {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -5px, 0); }
+}
+
+@keyframes qc-arch-flow {
+  0% { stroke-dashoffset: 24; opacity: 0.35; }
+  50% { opacity: 0.9; }
+  100% { stroke-dashoffset: 0; opacity: 0.35; }
+}
+
+@media (min-width: 768px) {
+  .qc-float-slow {
+    animation: qc-float-subtle 5.5s ease-in-out infinite;
+    will-change: transform;
+  }
+  .qc-float-slow-delay-1 {
+    animation: qc-float-subtle 6s ease-in-out 0.8s infinite;
+    will-change: transform;
+  }
+  .qc-float-slow-delay-2 {
+    animation: qc-float-subtle 6.5s ease-in-out 1.6s infinite;
+    will-change: transform;
+  }
+}
+
+.qc-arch-connector-flow {
+  animation: qc-arch-flow 2.8s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .qc-float-slow,
+  .qc-float-slow-delay-1,
+  .qc-float-slow-delay-2,
+  .qc-arch-connector-flow {
+    animation: none !important;
+    transform: none !important;
   }
 }
 

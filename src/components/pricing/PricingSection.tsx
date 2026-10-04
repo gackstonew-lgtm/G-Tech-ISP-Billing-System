@@ -13,6 +13,11 @@ import {
   CheckCircle2,
   MessageSquare,
 } from "lucide-react";
+import {
+  ScrollReveal,
+  StaggerContainer,
+  StaggerItem,
+} from "@/components/ui/ScrollReveal";
 
 export function PricingSection() {
   const [salesModalOpen, setSalesModalOpen] = useState(false);
@@ -44,7 +49,10 @@ export function PricingSection() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto space-y-3">
+        <ScrollReveal
+          variant="fade-up"
+          className="text-center max-w-3xl mx-auto space-y-3"
+        >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold border border-primary/20">
             <CreditCard className="w-3.5 h-3.5" />
             <span>Transparent ISP Pricing</span>
@@ -55,136 +63,145 @@ export function PricingSection() {
           <p className="text-sm sm:text-base text-muted-foreground">
             Align platform costs directly with your active Hotspot and PPPoE operations.
           </p>
-        </div>
+        </ScrollReveal>
 
         {/* 3 Pricing Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <StaggerContainer
+          staggerMs={90}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch"
+        >
           {/* TIER 1: HOTSPOT */}
-          <div className="p-6 sm:p-8 rounded-3xl bg-surface-subtle border border-border hover:border-primary/40 transition-all duration-200 flex flex-col justify-between space-y-8">
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-lg border border-primary/20">
-                  Hotspot
-                </span>
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
-                  <Wifi className="w-5 h-5" />
+          <StaggerItem index={0} variant="fade-up" className="flex">
+            <div className="w-full p-6 sm:p-8 rounded-3xl bg-surface-subtle border border-border hover:border-primary/40 hover:-translate-y-1 hover:shadow-md transition-all duration-200 flex flex-col justify-between space-y-8">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-lg border border-primary/20">
+                    Hotspot
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center">
+                    <Wifi className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
+                  For public WiFi, voucher and captive-portal networks.
+                </p>
+
+                <div className="pt-2 border-t border-border">
+                  <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
+                    3%
+                  </div>
+                  <div className="text-xs font-bold text-muted-foreground mt-1.5">
+                    of hotspot revenue
+                  </div>
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                For public WiFi, voucher and captive-portal networks.
-              </p>
-
-              <div className="pt-2 border-t border-border">
-                <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
-                  3%
-                </div>
-                <div className="text-xs font-bold text-muted-foreground mt-1.5">
-                  of hotspot revenue
-                </div>
-              </div>
+              <Link
+                href="/register"
+                className="w-full py-3.5 px-5 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-elevated hover:-translate-y-0.5 active:scale-[0.98] text-foreground text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <span>Start free trial</span>
+                <ArrowRight className="w-4 h-4 text-primary" />
+              </Link>
             </div>
-
-            <Link
-              href="/register"
-              className="w-full py-3.5 px-5 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-elevated text-foreground text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2"
-            >
-              <span>Start free trial</span>
-              <ArrowRight className="w-4 h-4 text-primary" />
-            </Link>
-          </div>
+          </StaggerItem>
 
           {/* TIER 2: PPPoE */}
-          <div className="p-6 sm:p-8 rounded-3xl bg-surface-subtle border-2 border-primary/50 shadow-xs transition-all duration-200 flex flex-col justify-between space-y-8 relative">
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-lg border border-primary/20">
-                  PPPoE
-                </span>
-                <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
-                  <RouterIcon className="w-5 h-5" />
+          <StaggerItem index={1} variant="fade-up" className="flex">
+            <div className="w-full p-6 sm:p-8 rounded-3xl bg-surface-subtle border-2 border-primary/50 shadow-xs hover:-translate-y-1 hover:shadow-md transition-all duration-200 flex flex-col justify-between space-y-8 relative">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-primary bg-primary/10 px-3 py-1 rounded-lg border border-primary/20">
+                    PPPoE
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center">
+                    <RouterIcon className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
+                  For fibre and wireless broadband subscribers on monthly plans.
+                </p>
+
+                <div className="pt-2 border-t border-border">
+                  <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
+                    $0.25
+                  </div>
+                  <div className="text-xs font-bold text-muted-foreground mt-1.5">
+                    per active user / month
+                  </div>
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                For fibre and wireless broadband subscribers on monthly plans.
-              </p>
-
-              <div className="pt-2 border-t border-border">
-                <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
-                  $0.25
-                </div>
-                <div className="text-xs font-bold text-muted-foreground mt-1.5">
-                  per active user / month
-                </div>
-              </div>
+              <Link
+                href="/register"
+                className="w-full py-3.5 px-5 rounded-xl bg-primary hover:bg-primary-hover hover:-translate-y-0.5 active:scale-[0.98] text-primary-foreground text-xs sm:text-sm font-bold transition-all duration-200 shadow-xs flex items-center justify-center gap-2"
+              >
+                <span>Start free trial</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
-
-            <Link
-              href="/register"
-              className="w-full py-3.5 px-5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-2"
-            >
-              <span>Start free trial</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          </StaggerItem>
 
           {/* TIER 3: ENTERPRISE */}
-          <div className="p-6 sm:p-8 rounded-3xl bg-surface-subtle border border-border hover:border-primary/40 transition-all duration-200 flex flex-col justify-between space-y-8">
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-foreground bg-surface px-3 py-1 rounded-lg border border-border">
-                  Enterprise
-                </span>
-                <div className="w-10 h-10 rounded-xl bg-surface border border-border text-primary flex items-center justify-center">
-                  <Building2 className="w-5 h-5" />
+          <StaggerItem index={2} variant="fade-up" className="flex">
+            <div className="w-full p-6 sm:p-8 rounded-3xl bg-surface-subtle border border-border hover:border-primary/40 hover:-translate-y-1 hover:shadow-md transition-all duration-200 flex flex-col justify-between space-y-8">
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-foreground bg-surface px-3 py-1 rounded-lg border border-border">
+                    Enterprise
+                  </span>
+                  <div className="w-10 h-10 rounded-xl bg-surface border border-border text-primary flex items-center justify-center">
+                    <Building2 className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
+                  For operators with 10,000+ subscribers, multiple regions or regulatory requirements.
+                </p>
+
+                <div className="pt-2 border-t border-border">
+                  <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
+                    Custom
+                  </div>
+                  <div className="text-xs font-bold text-muted-foreground mt-1.5">
+                    volume pricing
+                  </div>
+                </div>
+
+                {/* Enterprise Scope Options (Clearly marked as available on request) */}
+                <div className="pt-3 border-t border-border space-y-2.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Available on request for custom deployments:
+                  </div>
+                  <ul className="space-y-2 text-xs text-muted-foreground font-semibold">
+                    {[
+                      "Dedicated infrastructure resources",
+                      "Guided onboarding & migration assistance",
+                      "Custom integrations, API limits & branding",
+                      "Tailored operational & billing arrangements",
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                For operators with 10,000+ subscribers, multiple regions or regulatory requirements.
-              </p>
-
-              <div className="pt-2 border-t border-border">
-                <div className="text-4xl sm:text-5xl font-extrabold text-foreground tracking-tight">
-                  Custom
-                </div>
-                <div className="text-xs font-bold text-muted-foreground mt-1.5">
-                  volume pricing
-                </div>
-              </div>
-
-              {/* Enterprise Scope Options (Clearly marked as available on request) */}
-              <div className="pt-3 border-t border-border space-y-2.5">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Available on request for custom deployments:
-                </div>
-                <ul className="space-y-2 text-xs text-muted-foreground font-semibold">
-                  {[
-                    "Dedicated infrastructure resources",
-                    "Guided onboarding & migration assistance",
-                    "Custom integrations, API limits & branding",
-                    "Tailored operational & billing arrangements",
-                  ].map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <button
+                type="button"
+                onClick={() => setSalesModalOpen(true)}
+                className="w-full py-3.5 px-5 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-elevated hover:-translate-y-0.5 active:scale-[0.98] text-foreground text-xs sm:text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4 text-primary" />
+                <span>Talk to sales</span>
+              </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setSalesModalOpen(true)}
-              className="w-full py-3.5 px-5 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-elevated text-foreground text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <MessageSquare className="w-4 h-4 text-primary" />
-              <span>Talk to sales</span>
-            </button>
-          </div>
-        </div>
+          </StaggerItem>
+        </StaggerContainer>
       </div>
 
       {/* Talk to Sales Modal */}
