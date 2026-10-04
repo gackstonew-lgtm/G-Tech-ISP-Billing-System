@@ -29,34 +29,80 @@ export class NOCService {
   static async getStats(isDemoParam?: boolean): Promise<ServiceResult<NOCStats>> {
     const isDemo = await this.checkIsDemo(isDemoParam);
 
-    if (isDemo || !SUPABASE_READY) {
+    if (isDemo) {
       return { data: getSeedNOCStats(), error: null };
+    }
+
+    const emptyStats: NOCStats = {
+      totalSubscribers: 0,
+      activeSubscribers: 0,
+      onlinePppoe: 0,
+      onlineHotspot: 0,
+      sessionsAvailable: false,
+      expiringIn24h: 0,
+      suspendedCount: 0,
+      totalRouters: 0,
+      onlineRouters: 0,
+      currentBandwidthMbps: { download: 0, upload: 0 },
+      revenueToday: 0,
+      revenueThisMonth: 0,
+      recentAlerts: [],
+    };
+
+    if (!SUPABASE_READY) {
+      return { data: emptyStats, error: null };
     }
 
     try {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let orgId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id ?? undefined;
+      }
+
+      let subsQuery = supabase
+        .from("subscriptions")
+        .select("status, end_time", { count: "exact" })
+        .in("status", ["ACTIVE", "GRACE", "SUSPENDED", "EXPIRED"]);
+      let routersQuery = supabase
+        .from("routers")
+        .select("status", { count: "exact" });
+      let alertsQuery = supabase
+        .from("network_alerts")
+        .select("*")
+        .eq("is_resolved", false)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      let revenueQuery = supabase
+        .from("payments")
+        .select("amount, created_at")
+        .eq("status", "COMPLETED")
+        .gte("created_at", new Date(new Date(new Date().setDate(1)).setHours(0, 0, 0, 0)).toISOString());
+
+      if (orgId) {
+        subsQuery = subsQuery.eq("organization_id", orgId);
+        routersQuery = routersQuery.eq("organization_id", orgId);
+        alertsQuery = alertsQuery.eq("organization_id", orgId);
+        revenueQuery = revenueQuery.eq("organization_id", orgId);
+      }
+
       const [subscribersResult, routersResult, alertsResult, revenueResult] =
         await Promise.allSettled([
-          supabase
-            .from("subscriptions")
-            .select("status, end_time", { count: "exact" })
-            .in("status", ["ACTIVE", "GRACE", "SUSPENDED", "EXPIRED"]),
-          supabase
-            .from("routers")
-            .select("status", { count: "exact" }),
-          supabase
-            .from("network_alerts")
-            .select("*")
-            .eq("is_resolved", false)
-            .order("created_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("payments")
-            .select("amount, created_at")
-            .eq("status", "COMPLETED")
-            .gte("created_at", new Date(new Date(new Date().setDate(1)).setHours(0, 0, 0, 0)).toISOString()),
+          subsQuery,
+          routersQuery,
+          alertsQuery,
+          revenueQuery,
         ]);
 
       let totalSubscribers = 0;
@@ -135,7 +181,7 @@ export class NOCService {
       return { data: stats, error: null };
     } catch (err) {
       const appError = handleSupabaseError(err, "noc.stats");
-      return { data: getSeedNOCStats(), error: appError.userMessage };
+      return { data: emptyStats, error: appError.userMessage };
     }
   }
 }

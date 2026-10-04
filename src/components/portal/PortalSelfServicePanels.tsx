@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Wifi,
   FileText,
@@ -11,6 +11,8 @@ import {
 import { formatKES, formatShortDate } from "@/lib/utils";
 import { SEED_PLANS } from "@/lib/db/mock-db";
 import { SEED_INVOICES_2027 } from "@/lib/db/os-2027-seed";
+import { useAuth } from "@/lib/auth/auth-context";
+import type { ServicePlan } from "@/types";
 
 export function PortalSelfServicePanels({
   accountNumber,
@@ -19,16 +21,50 @@ export function PortalSelfServicePanels({
   accountNumber: string;
   customerName: string;
 }) {
-  const pppoePlans = SEED_PLANS.filter((p) => p.serviceType === "PPPOE");
-  const [selectedPlanId, setSelectedPlanId] = useState(pppoePlans[1]?.id || "");
+  const { isDemoMode } = useAuth();
+  const [pppoePlans, setPppoePlans] = useState<ServicePlan[]>(() =>
+    isDemoMode ? SEED_PLANS.filter((p) => p.serviceType === "PPPOE") : []
+  );
+  const [selectedPlanId, setSelectedPlanId] = useState(
+    isDemoMode ? SEED_PLANS.filter((p) => p.serviceType === "PPPOE")[1]?.id || "" : ""
+  );
   const [planNotice, setPlanNotice] = useState<string | null>(null);
   const [wifiDiagStatus, setWifiDiagStatus] = useState<string | null>(null);
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketNotice, setTicketNotice] = useState<string | null>(null);
 
-  const subscriberInvoices = SEED_INVOICES_2027.filter(
-    (i) => i.accountNumber === accountNumber || i.customerId === "cust-01"
-  );
+  useEffect(() => {
+    if (isDemoMode) {
+      const plans = SEED_PLANS.filter((p) => p.serviceType === "PPPOE");
+      setPppoePlans(plans);
+      setSelectedPlanId(plans[1]?.id || plans[0]?.id || "");
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/service-plans?type=PPPOE");
+        const json = await res.json();
+        if (!cancelled && Array.isArray(json?.data)) {
+          setPppoePlans(json.data);
+          setSelectedPlanId(json.data[0]?.id || "");
+        }
+      } catch {
+        // Keep empty on error
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemoMode]);
+
+  const subscriberInvoices = isDemoMode
+    ? SEED_INVOICES_2027.filter(
+        (i) => i.accountNumber === accountNumber || i.customerId === "cust-01"
+      )
+    : [];
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -44,12 +80,14 @@ export function PortalSelfServicePanels({
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Optical Signal (ONT)</span>
             <span className="font-mono font-bold text-emerald-500">
-              -19.4 dBm (Optimal)
+              {isDemoMode ? "-19.4 dBm (Optimal)" : "Not polled"}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Connection Quality</span>
-            <span className="font-bold text-foreground">96 / 100</span>
+            <span className="font-bold text-foreground">
+              {isDemoMode ? "96 / 100" : "—"}
+            </span>
           </div>
         </div>
 
@@ -62,21 +100,26 @@ export function PortalSelfServicePanels({
             onChange={(e) => setSelectedPlanId(e.target.value)}
             className="w-full rounded-xl border border-border bg-surface-elevated px-3 py-2 text-xs font-semibold text-foreground"
           >
-            {pppoePlans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {formatKES(p.price)}/mo
-              </option>
-            ))}
+            {pppoePlans.length === 0 ? (
+              <option value="">No service plans configured</option>
+            ) : (
+              pppoePlans.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — {formatKES(p.price)}/mo
+                </option>
+              ))
+            )}
           </select>
           <div className="flex gap-2 pt-1">
             <button
               type="button"
+              disabled={pppoePlans.length === 0}
               onClick={() =>
                 setPlanNotice(
                   "Plan change scheduled. FreeRADIUS CoA rate-limit will update immediately upon next renewal."
                 )
               }
-              className="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary-hover transition"
+              className="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary-hover transition disabled:opacity-50"
             >
               Request Tier Switch
             </button>
@@ -84,7 +127,9 @@ export function PortalSelfServicePanels({
               type="button"
               onClick={() =>
                 setWifiDiagStatus(
-                  "TR-369 USP check passed: 5GHz channel clear, 0% packet loss, 8ms RTT."
+                  isDemoMode
+                    ? "TR-369 USP check passed: 5GHz channel clear, 0% packet loss, 8ms RTT."
+                    : "Line diagnostic requested."
                 )
               }
               className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-elevated px-3 py-2 text-xs font-bold text-foreground hover:border-primary/40"
@@ -115,25 +160,31 @@ export function PortalSelfServicePanels({
           </h3>
         </div>
         <div className="space-y-2.5 text-xs">
-          {subscriberInvoices.map((inv) => (
-            <div
-              key={inv.id}
-              className="rounded-xl border border-border bg-surface-elevated/60 p-3 space-y-1"
-            >
-              <div className="flex items-center justify-between font-bold">
-                <span className="font-mono text-primary">
-                  {inv.invoiceNumber}
-                </span>
-                <span>{formatKES(inv.totalAmount)}</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>VAT (16%): {formatKES(inv.taxAmount)}</span>
-                <span className="font-semibold text-emerald-500">
-                  {inv.status} · {formatShortDate(inv.createdAt)}
-                </span>
-              </div>
+          {subscriberInvoices.length === 0 ? (
+            <div className="rounded-xl border border-border bg-surface-elevated/60 p-4 text-center text-muted-foreground">
+              No invoices recorded for this subscriber yet.
             </div>
-          ))}
+          ) : (
+            subscriberInvoices.map((inv) => (
+              <div
+                key={inv.id}
+                className="rounded-xl border border-border bg-surface-elevated/60 p-3 space-y-1"
+              >
+                <div className="flex items-center justify-between font-bold">
+                  <span className="font-mono text-primary">
+                    {inv.invoiceNumber}
+                  </span>
+                  <span>{formatKES(inv.totalAmount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>VAT (16%): {formatKES(inv.taxAmount)}</span>
+                  <span className="font-semibold text-emerald-500">
+                    {inv.status} · {formatShortDate(inv.createdAt)}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

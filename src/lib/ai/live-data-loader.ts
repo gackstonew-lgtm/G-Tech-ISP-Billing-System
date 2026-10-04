@@ -68,6 +68,75 @@ const SUPABASE_CONFIGURED = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://[PROJECT_REF].supabase.co"
 );
 
+function buildEmptyLiveCopilotEnvironment(options?: {
+  organizationId?: string;
+  organizationName?: string;
+  userRole?: UserRole;
+  userId?: string;
+  userEmail?: string;
+}): {
+  ctx: CopilotExecutionContext;
+  dataset: CopilotDataset;
+} {
+  const orgId = options?.organizationId || "org-live-unconfigured";
+  const orgName = options?.organizationName || "ISP Workspace";
+  const nowIso = new Date().toISOString();
+
+  const organization: Organization = {
+    id: orgId,
+    name: orgName,
+    slug: "isp-workspace",
+    email: options?.userEmail || "",
+    phone: "",
+    currency: "KES",
+    timezone: "Africa/Nairobi",
+    billingCycleType: "ANNIVERSARY",
+    gracePeriodDays: 2,
+    isActive: true,
+    createdAt: nowIso,
+  };
+
+  const ctx: CopilotExecutionContext = {
+    organizationId: orgId,
+    organizationName: orgName,
+    currency: "KES",
+    timezone: "Africa/Nairobi",
+    userRole: options?.userRole ?? "isp_admin",
+    userId: options?.userId,
+    userEmail: options?.userEmail,
+    environmentMode: "LIVE_TENANT_DATA",
+    checkedAtIso: nowIso,
+  };
+
+  const dataset: CopilotDataset = {
+    organization,
+    customers: [],
+    pppoeAccounts: [],
+    subscriptions: [],
+    plans: [],
+    routers: [],
+    sites: [],
+    invoices: [],
+    payments: [],
+    vouchers: [],
+    workOrders: [],
+    alerts: [],
+    olts: [],
+    onts: [],
+    tickets: [],
+    inventory: [],
+    assets: [],
+    topologyNodes: [],
+    journalEntries: [],
+    systemEvents: [],
+    securityEvents: [],
+    unmatchedPaymentsCount: 0,
+    pendingApprovalsCount: 0,
+  };
+
+  return { ctx, dataset };
+}
+
 /**
  * Resolves the authoritative Copilot environment (Live Supabase Tenant Data vs. Demo Data).
  */
@@ -90,8 +159,14 @@ export async function loadLiveOrDemoCopilotEnvironment(options?: {
     }
   }
 
-  if (isDemo || !SUPABASE_CONFIGURED) {
+  if (isDemo) {
     return buildDemoCopilotEnvironment({ userRole: options?.userRoleOverride });
+  }
+
+  if (!SUPABASE_CONFIGURED) {
+    return buildEmptyLiveCopilotEnvironment({
+      userRole: options?.userRoleOverride,
+    });
   }
 
   try {
@@ -103,8 +178,7 @@ export async function loadLiveOrDemoCopilotEnvironment(options?: {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      // Unauthenticated request on public demo falls back to isolated DEMO_DATA
-      return buildDemoCopilotEnvironment({
+      return buildEmptyLiveCopilotEnvironment({
         userRole: options?.userRoleOverride,
       });
     }
@@ -116,8 +190,14 @@ export async function loadLiveOrDemoCopilotEnvironment(options?: {
       .single();
 
     if (!profileRow || !profileRow.organization_id) {
-      return buildDemoCopilotEnvironment({
+      return buildEmptyLiveCopilotEnvironment({
+        organizationId: `org-user-${user.id}`,
+        organizationName:
+          (user.user_metadata?.organization_name as string | undefined) ||
+          "ISP Workspace",
         userRole: options?.userRoleOverride,
+        userId: user.id,
+        userEmail: user.email,
       });
     }
 
@@ -224,7 +304,19 @@ export async function loadLiveOrDemoCopilotEnvironment(options?: {
           isActive: orgRow.is_active,
           createdAt: orgRow.created_at,
         }
-      : { ...SEED_ORGANIZATION, id: orgId };
+      : {
+          id: orgId,
+          name: "ISP Workspace",
+          slug: "isp-workspace",
+          email: user.email || "",
+          phone: "",
+          currency: "KES",
+          timezone: "Africa/Nairobi",
+          billingCycleType: "ANNIVERSARY",
+          gracePeriodDays: 2,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
 
     const sites: Site[] = (sitesRes.data ?? []).map((s) => ({
       id: s.id,
@@ -539,7 +631,7 @@ export async function loadLiveOrDemoCopilotEnvironment(options?: {
 
     return { ctx, dataset };
   } catch {
-    return buildDemoCopilotEnvironment({
+    return buildEmptyLiveCopilotEnvironment({
       userRole: options?.userRoleOverride,
     });
   }

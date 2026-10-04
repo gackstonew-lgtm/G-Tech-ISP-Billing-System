@@ -28,7 +28,6 @@ import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
 import { cn, formatShortDate } from "@/lib/utils";
 import {
   calculateSmsSegments,
-  APPROVED_SMS_VARIABLES,
   EVENT_SUPPORTED_VARIABLES,
   validateTemplateVariables,
   resolvePersonalizedMessage,
@@ -200,15 +199,11 @@ export default function SmsPage() {
     useState<SmsMessageType>("PAYMENT_REMINDER");
   const [category, setCategory] = useState<SmsCategory>("TRANSACTIONAL");
   const [selectedTemplateCode, setSelectedTemplateCode] = useState<string>("");
-  const [messageText, setMessageText] = useState<string>(
-    "Hello {{customer_name}}, your {{isp_name}} account ({{account_number}}) has an outstanding balance of {{amount_due}}. Please pay via M-Pesa Paybill {{paybill_number}} Account {{account_number}} to avoid service interruption."
-  );
+  const [messageText, setMessageText] = useState<string>("");
 
   // Recipient filters & selection
   const [customerSearch, setCustomerSearch] = useState("");
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([
-    "cust-01",
-  ]);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [filterPlanId, setFilterPlanId] = useState<string>("");
   const [filterSiteId, setFilterSiteId] = useState<string>("");
   const [filterRouterId, setFilterRouterId] = useState<string>("");
@@ -274,7 +269,13 @@ export default function SmsPage() {
       const d = json.data;
       setOverview(d.overview);
       setProvider(d.provider);
-      setRecipients(d.recipients || []);
+      const loadedRecipients = (d.recipients || []) as EnrichedSmsRecipient[];
+      setRecipients(loadedRecipients);
+      if (loadedRecipients.length > 0) {
+        setSelectedCustomerIds((prev) =>
+          prev.length === 0 ? [loadedRecipients[0].customerId] : prev
+        );
+      }
       setTemplates(d.templates || []);
       setHistory(d.history || []);
       setPlans(d.plans || []);
@@ -510,10 +511,6 @@ export default function SmsPage() {
       setMessageText(found.bodyTemplate);
       setCategory(found.category);
     }
-  };
-
-  const handleInsertVariable = (varName: string) => {
-    setMessageText((prev) => `${prev}${prev.endsWith(" ") ? "" : " "}{{${varName}}}`);
   };
 
   const handleToggleSelectedCustomer = (customerId: string) => {
@@ -1129,13 +1126,13 @@ export default function SmsPage() {
                     </div>
                   </div>
 
-                  <div className="relative mt-3">
+                   <div className="relative mt-3">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="search"
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
-                      placeholder="Search name, GT-8921, +254712..., email, package, or status..."
+                      placeholder="Search by customer name, account number, phone, email, package, or status..."
                       className={cn(inputClass, "pl-9")}
                     />
                   </div>
@@ -1237,7 +1234,7 @@ export default function SmsPage() {
                 </section>
               </div>
 
-              {/* Right Column: Message Composer, Personalization & Campaign Summary */}
+              {/* Right Column: Message Composer & Campaign Summary */}
               <div className="space-y-4 lg:col-span-5">
                 <section className="rounded-lg border border-border bg-surface p-4 shadow-xs space-y-4">
                   <div className="flex items-center justify-between">
@@ -1308,32 +1305,13 @@ export default function SmsPage() {
                       onChange={(e) => handleApplyTemplate(e.target.value)}
                       className={inputClass}
                     >
-                      <option value="">-- Custom or select template --</option>
+                      <option value="">-- Custom message or select template --</option>
                       {templates.map((t) => (
                         <option key={t.id} value={t.code}>
                           {t.name} ({t.category})
                         </option>
                       ))}
                     </select>
-                  </div>
-
-                  {/* Personalization Variable Chips (Section 19) */}
-                  <div>
-                    <span className="mb-1.5 block text-xs font-medium text-foreground">
-                      Insert Personalization Variable:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {APPROVED_SMS_VARIABLES.map((v) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => handleInsertVariable(v)}
-                          className="rounded border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] text-foreground hover:border-primary hover:text-primary"
-                        >
-                          {`{{${v}}}`}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Message Textarea */}
@@ -1350,7 +1328,7 @@ export default function SmsPage() {
                       required
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
-                      placeholder="Type your SMS message or choose a template above..."
+                      placeholder="Type your SMS message..."
                       className="w-full rounded-md border border-border bg-surface p-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
                     />
                   </div>
@@ -1391,10 +1369,10 @@ export default function SmsPage() {
                     </div>
                   </div>
 
-                  {/* Section 20: Campaign Summary & Live Personalized Preview */}
+                  {/* Section 20: Campaign Summary & Live Preview */}
                   <div className="rounded-md border border-border bg-surface-subtle p-3 space-y-2 text-xs">
                     <div className="flex items-center justify-between font-semibold text-foreground">
-                      <span>Message Preview (Resolved Variables)</span>
+                      <span>Message Preview</span>
                       {composerAnalysis.sampleRecipient && (
                         <span className="font-mono text-[11px] text-muted-foreground">
                           {composerAnalysis.sampleRecipient.customerName} (
@@ -1403,8 +1381,12 @@ export default function SmsPage() {
                       )}
                     </div>
 
-                    {!composerAnalysis.tplValidation.valid ||
-                    !composerAnalysis.personalized.ok ? (
+                    {!messageText.trim() ? (
+                      <p className="rounded border border-border bg-surface p-2.5 text-xs text-muted-foreground">
+                        Enter a message above to preview.
+                      </p>
+                    ) : !composerAnalysis.tplValidation.valid ||
+                      !composerAnalysis.personalized.ok ? (
                       <div className="rounded border border-danger/30 bg-danger-soft p-2 text-danger">
                         {composerAnalysis.tplValidation.error ||
                           composerAnalysis.personalized.error}
@@ -1438,6 +1420,7 @@ export default function SmsPage() {
                     disabled={
                       isDispatching ||
                       !permissions.canSend ||
+                      !messageText.trim() ||
                       !composerAnalysis.tplValidation.valid ||
                       !composerAnalysis.personalized.ok ||
                       composerAnalysis.recipientCount === 0
@@ -1718,23 +1701,15 @@ export default function SmsPage() {
                   </div>
 
                   <div>
-                    <span className="mb-1 block text-[11px] text-muted-foreground">
-                      Supported variables for <code>{tplEvent}</code>:{" "}
-                      {(EVENT_SUPPORTED_VARIABLES[tplEvent] || []).map((v) => (
-                        <code
-                          key={v}
-                          className="mr-1 rounded bg-surface-subtle px-1 py-0.5 font-mono text-[10px] text-foreground"
-                        >
-                          {`{{${v}}}`}
-                        </code>
-                      ))}
-                    </span>
+                    <label className="mb-1 block text-xs font-medium text-foreground">
+                      Template Body
+                    </label>
                     <textarea
                       rows={4}
                       required
                       value={tplBody}
                       onChange={(e) => setTplBody(e.target.value)}
-                      placeholder="Hello {{customer_name}}, your {{package_name}} subscription expires on {{expiry_date}}..."
+                      placeholder="Enter template message body..."
                       className="w-full rounded-md border border-border bg-surface p-3 text-sm text-foreground focus:border-primary focus:outline-none"
                     />
                   </div>

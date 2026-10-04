@@ -29,7 +29,7 @@ export class PlansService {
   static async list(serviceType?: ServiceType, isDemoParam?: boolean): Promise<ServiceResult<ServicePlan[]>> {
     const isDemo = await this.checkIsDemo(isDemoParam);
 
-    if (isDemo || !SUPABASE_READY) {
+    if (isDemo) {
       let data = [...SEED_PLANS];
       if (serviceType) {
         data = data.filter((p) => p.serviceType === serviceType);
@@ -37,9 +37,27 @@ export class PlansService {
       return { data, error: null, count: data.length };
     }
 
+    if (!SUPABASE_READY) {
+      return { data: [], error: null, count: 0 };
+    }
+
     try {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let orgId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id ?? undefined;
+      }
 
       let query = supabase
         .from("plans")
@@ -47,20 +65,25 @@ export class PlansService {
         .eq("is_active", true)
         .order("price", { ascending: true });
 
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
       if (serviceType) {
         query = query.eq("service_type", serviceType);
       }
 
       const { data, error, count } = await query;
 
-      if (error || !data) {
-        return { data: SEED_PLANS, error: null, count: SEED_PLANS.length };
+      if (error) {
+        const appError = handleSupabaseError(error, "plans.list");
+        return { data: null, error: appError.userMessage };
       }
 
       const plans: ServicePlan[] = (data ?? []).map(mapPlanRow);
       return { data: plans, error: null, count: count ?? plans.length };
     } catch (err) {
-      return { data: SEED_PLANS, error: null, count: SEED_PLANS.length };
+      const appError = handleSupabaseError(err, "plans.list");
+      return { data: null, error: appError.userMessage };
     }
   }
 }

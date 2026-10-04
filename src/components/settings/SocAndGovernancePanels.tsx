@@ -14,6 +14,7 @@ import {
   SEED_SECURITY_EVENTS,
 } from "@/lib/db/os-2027-seed";
 import { listRolePermissions } from "@/lib/auth/rbac";
+import { useAuth } from "@/lib/auth/auth-context";
 import type { UserRole } from "@/types";
 
 const ROLES_TO_INSPECT: UserRole[] = [
@@ -28,8 +29,12 @@ const ROLES_TO_INSPECT: UserRole[] = [
 ];
 
 export function SocAndGovernancePanels() {
+  const { isDemoMode } = useAuth();
   const [selectedRole, setSelectedRole] = useState<UserRole>("noc_engineer");
   const permissions = listRolePermissions(selectedRole);
+
+  const securityEvents = isDemoMode ? SEED_SECURITY_EVENTS : [];
+  const systemEvents = isDemoMode ? SEED_SYSTEM_EVENTS : [];
 
   return (
     <div className="space-y-6 pt-4">
@@ -49,30 +54,36 @@ export function SocAndGovernancePanels() {
             </div>
           </header>
           <div className="divide-y divide-border-subtle">
-            {SEED_SECURITY_EVENTS.map((sec) => (
-              <div key={sec.id} className="space-y-1 p-4 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-semibold text-primary">
-                    {sec.eventCode}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                      sec.severity === "HIGH" || sec.severity === "CRITICAL"
-                        ? "bg-danger-soft text-danger"
-                        : "bg-success-soft text-success"
-                    )}
-                  >
-                    {sec.severity}
-                  </span>
-                </div>
-                <p className="text-foreground">{sec.description}</p>
-                <div className="text-[11px] text-muted-foreground">
-                  Source IP: <span className="font-mono">{sec.sourceIp}</span> ·
-                  Mitigation: {sec.mitigationAction}
-                </div>
+            {securityEvents.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+                No security events or threat alerts recorded.
               </div>
-            ))}
+            ) : (
+              securityEvents.map((sec) => (
+                <div key={sec.id} className="space-y-1 p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-semibold text-primary">
+                      {sec.eventCode}
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                        sec.severity === "HIGH" || sec.severity === "CRITICAL"
+                          ? "bg-danger-soft text-danger"
+                          : "bg-success-soft text-success"
+                      )}
+                    >
+                      {sec.severity}
+                    </span>
+                  </div>
+                  <p className="text-foreground">{sec.description}</p>
+                  <div className="text-[11px] text-muted-foreground">
+                    Source IP: <span className="font-mono">{sec.sourceIp}</span> ·
+                    Mitigation: {sec.mitigationAction}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -91,23 +102,29 @@ export function SocAndGovernancePanels() {
             </div>
           </header>
           <div className="divide-y divide-border-subtle">
-            {SEED_SYSTEM_EVENTS.map((evt) => (
-              <div key={evt.id} className="space-y-1 p-4 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-semibold text-foreground">
-                    {evt.eventType}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {formatShortDate(evt.createdAt)}
-                  </span>
-                </div>
-                <p className="text-muted-foreground">{evt.summary}</p>
-                <div className="text-[11px] text-muted-foreground">
-                  Actor: <strong>{evt.actorName}</strong> · Category:{" "}
-                  {evt.category}
-                </div>
+            {systemEvents.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+                No system audit events recorded yet.
               </div>
-            ))}
+            ) : (
+              systemEvents.map((evt) => (
+                <div key={evt.id} className="space-y-1 p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-semibold text-foreground">
+                      {evt.eventType}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatShortDate(evt.createdAt)}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground">{evt.summary}</p>
+                  <div className="text-[11px] text-muted-foreground">
+                    Actor: <strong>{evt.actorName}</strong> · Category:{" "}
+                    {evt.category}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
       </div>
@@ -163,13 +180,21 @@ export function SocAndGovernancePanels() {
             for ERP, accounting, and WhatsApp Business gateway integrations.
           </p>
           <div className="rounded border border-border bg-surface-subtle p-2.5 font-mono text-xs">
-            <div>
-              Endpoint: <span className="text-primary">https://erp.nexanet.co.ke/webhooks/isp</span>
-            </div>
-            <div className="text-muted-foreground">
-              Subscribed: payment.completed, subscriber.suspended,
-              network.outage_detected
-            </div>
+            {isDemoMode ? (
+              <>
+                <div>
+                  Endpoint: <span className="text-primary">https://erp.nexanet.co.ke/webhooks/isp</span>
+                </div>
+                <div className="text-muted-foreground">
+                  Subscribed: payment.completed, subscriber.suspended,
+                  network.outage_detected
+                </div>
+              </>
+            ) : (
+              <div className="text-muted-foreground">
+                No outbound webhook endpoints configured yet.
+              </div>
+            )}
           </div>
         </section>
       </div>

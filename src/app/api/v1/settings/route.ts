@@ -69,7 +69,7 @@ export async function GET() {
   const cookieStore = await cookies();
   const isDemo = cookieStore.get("gtech_demo_mode")?.value === "true";
 
-  if (isDemo || !SUPABASE_READY) {
+  if (isDemo) {
     return NextResponse.json({
       success: true,
       data: {
@@ -79,6 +79,18 @@ export async function GET() {
         isDemo: true,
       },
     });
+  }
+
+  if (!SUPABASE_READY) {
+    return NextResponse.json(
+      {
+        success: false,
+        code: "SETTINGS_UNAVAILABLE",
+        message: "Organization settings are currently unavailable.",
+        error: "Organization settings are currently unavailable.",
+      },
+      { status: 503 }
+    );
   }
 
   try {

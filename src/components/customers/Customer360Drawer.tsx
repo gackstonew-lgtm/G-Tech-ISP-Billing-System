@@ -8,16 +8,15 @@ import {
   CreditCard,
   Send,
   RefreshCw,
-  AlertTriangle,
   CheckCircle2,
   Wifi,
-  FileText,
   Terminal,
 } from "lucide-react";
 import { Customer } from "@/types";
 import { cn, formatKES, formatShortDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { btnClass } from "@/components/ui/PageHeader";
+import { useAuth } from "@/lib/auth/auth-context";
 import { buildCustomer360Dossier } from "@/lib/db/os-2027-seed";
 import {
   classifyOpticalPower,
@@ -43,6 +42,7 @@ export function Customer360Drawer({
   onClose,
   onToggleSuspend,
 }: Customer360DrawerProps) {
+  const { isDemoMode } = useAuth();
   const [activeTab, setActiveTab] = useState<DrawerTab>("OVERVIEW");
   const [controlOutput, setControlOutput] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState(
@@ -52,22 +52,26 @@ export function Customer360Drawer({
 
   if (!customer) return null;
 
-  const dossier = buildCustomer360Dossier(customer.id);
-  const rxDbm = dossier.ont?.rxPowerDbm ?? -19.4;
-  const opticalHealth = classifyOpticalPower(rxDbm);
+  const dossier = isDemoMode ? buildCustomer360Dossier(customer.id) : null;
+  const rxDbm = dossier?.ont?.rxPowerDbm ?? null;
+  const opticalHealth = rxDbm !== null ? classifyOpticalPower(rxDbm) : null;
 
   const handleRunControlCommand = (
     action: "DISCONNECT_SESSION" | "COA_RATE_LIMIT" | "REBOOT_ONT" | "PROVISION_ONT_VLAN"
   ) => {
+    if (!isDemoMode && !dossier?.pppoe && !dossier?.ont) {
+      setControlOutput("No active NAS router or OLT session bound to this subscriber.");
+      return;
+    }
     const cmd = buildSubscriberControlCommand({
       action,
-      username: dossier.pppoe?.username || `gt_${customer.accountNumber.toLowerCase()}`,
+      username: dossier?.pppoe?.username || customer.accountNumber.toLowerCase(),
       nasIpAddress: "10.200.1.2",
-      framedIpAddress: dossier.pppoe?.currentIp || "10.10.12.45",
+      framedIpAddress: dossier?.pppoe?.currentIp || "0.0.0.0",
       rateLimit: "10M/20M",
-      ontSerial: dossier.ont?.serialNumber || "HWTC8921A4B2",
-      ponPortLabel: dossier.ont?.ponPortLabel || "GPON 0/1/0:4",
-      vlanId: dossier.ont?.serviceVlan || 210,
+      ontSerial: dossier?.ont?.serialNumber || "UNASSIGNED",
+      ponPortLabel: dossier?.ont?.ponPortLabel || "UNASSIGNED",
+      vlanId: dossier?.ont?.serviceVlan || 100,
     });
     setControlOutput(`[${cmd.protocol}] ${cmd.summary}\n$ ${cmd.commandPayload}`);
   };
@@ -85,16 +89,16 @@ export function Customer360Drawer({
       variables: {
         customer_name: customer.fullName,
         account_number: customer.accountNumber,
-        amount: (customer.balanceDue > 0 ? customer.balanceDue : 2500).toLocaleString(),
-        reference: "RKF9283KDJ",
-        plan_name: dossier.subscription?.planName || "Silver Fiber - 10 Mbps",
-        expiry_date: dossier.subscription?.endTime
+        amount: customer.balanceDue.toLocaleString(),
+        reference: "N/A",
+        plan_name: dossier?.subscription?.planName || "Active Plan",
+        expiry_date: dossier?.subscription?.endTime
           ? formatShortDate(dossier.subscription.endTime)
-          : "04 Nov 2026",
-        paybill: "4084200",
-        support_phone: "+254712345678",
-        site_name: customer.siteName || "Nairobi Fiber Ring",
-        eta: "45 mins",
+          : "—",
+        paybill: "—",
+        support_phone: "—",
+        site_name: customer.siteName || "—",
+        eta: "—",
       },
     });
     setSentLogs((prev) => [log, ...prev]);
@@ -127,7 +131,7 @@ export function Customer360Drawer({
               {customer.fullName}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {customer.physicalAddress || customer.siteName || "Nairobi Fiber POP"} ·{" "}
+              {customer.physicalAddress || customer.siteName || "Address not set"} ·{" "}
               <span className="font-mono font-semibold text-foreground">
                 {formatPhoneForDisplay(customer.phoneNumber)}
               </span>
@@ -189,72 +193,76 @@ export function Customer360Drawer({
         <div className="flex-1 space-y-4 overflow-y-auto p-5 text-sm">
           {activeTab === "OVERVIEW" && (
             <>
-              {/* QoE & Churn Intelligence Cards */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-surface-subtle p-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Connection Quality Score (QoE)
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                        dossier.quality.score >= 80
-                          ? "bg-success-soft text-success"
-                          : dossier.quality.score >= 60
-                          ? "bg-warning-soft text-warning"
-                          : "bg-danger-soft text-danger"
-                      )}
-                    >
-                      {dossier.quality.tier}
-                    </span>
-                  </div>
-                  <div className="tabular mt-1 text-2xl font-bold">
-                    {dossier.quality.score}
-                    <span className="text-sm font-normal text-muted-foreground">/100</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {dossier.quality.summary}
-                  </p>
-                </div>
+              {dossier && (
+                <>
+                  {/* QoE & Churn Intelligence Cards */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border bg-surface-subtle p-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Connection Quality Score (QoE)
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                            dossier.quality.score >= 80
+                              ? "bg-success-soft text-success"
+                              : dossier.quality.score >= 60
+                              ? "bg-warning-soft text-warning"
+                              : "bg-danger-soft text-danger"
+                          )}
+                        >
+                          {dossier.quality.tier}
+                        </span>
+                      </div>
+                      <div className="tabular mt-1 text-2xl font-bold">
+                        {dossier.quality.score}
+                        <span className="text-sm font-normal text-muted-foreground">/100</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {dossier.quality.summary}
+                      </p>
+                    </div>
 
-                <div className="rounded-lg border border-border bg-surface-subtle p-3.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Predictive Churn Risk
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-[11px] font-semibold",
-                        dossier.churn.riskTier === "LOW"
-                          ? "bg-success-soft text-success"
-                          : dossier.churn.riskTier === "MODERATE"
-                          ? "bg-warning-soft text-warning"
-                          : "bg-danger-soft text-danger"
-                      )}
-                    >
-                      {dossier.churn.riskTier} RISK
-                    </span>
+                    <div className="rounded-lg border border-border bg-surface-subtle p-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Predictive Churn Risk
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[11px] font-semibold",
+                            dossier.churn.riskTier === "LOW"
+                              ? "bg-success-soft text-success"
+                              : dossier.churn.riskTier === "MODERATE"
+                              ? "bg-warning-soft text-warning"
+                              : "bg-danger-soft text-danger"
+                          )}
+                        >
+                          {dossier.churn.riskTier} RISK
+                        </span>
+                      </div>
+                      <div className="tabular mt-1 text-2xl font-bold">
+                        {dossier.churn.riskScore}
+                        <span className="text-sm font-normal text-muted-foreground">%</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {dossier.churn.primaryDrivers.join(" · ")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="tabular mt-1 text-2xl font-bold">
-                    {dossier.churn.riskScore}
-                    <span className="text-sm font-normal text-muted-foreground">%</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {dossier.churn.primaryDrivers.join(" · ")}
-                  </p>
-                </div>
-              </div>
 
-              {/* Next-Best Action Recommendation */}
-              <div className="rounded-lg border border-primary/25 bg-primary-soft p-3.5 text-xs">
-                <div className="font-semibold text-primary">
-                  Recommended Operator Action
-                </div>
-                <p className="mt-0.5 text-foreground">
-                  {dossier.churn.recommendedAction}
-                </p>
-              </div>
+                  {/* Next-Best Action Recommendation */}
+                  <div className="rounded-lg border border-primary/25 bg-primary-soft p-3.5 text-xs">
+                    <div className="font-semibold text-primary">
+                      Recommended Operator Action
+                    </div>
+                    <p className="mt-0.5 text-foreground">
+                      {dossier.churn.recommendedAction}
+                    </p>
+                  </div>
+                </>
+              )}
 
               {/* Service & Account Summary */}
               <div className="rounded-lg border border-border bg-surface p-4">
@@ -271,13 +279,13 @@ export function Customer360Drawer({
                   <div>
                     <dt className="text-muted-foreground">Service</dt>
                     <dd className="mt-0.5 font-semibold text-foreground">
-                      {dossier.pppoe ? "PPPoE" : "Hotspot"}
+                      {dossier?.pppoe ? "PPPoE" : "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Package</dt>
                     <dd className="mt-0.5 font-semibold text-foreground">
-                      {dossier.subscription?.planName || "Silver Fiber - 10 Mbps"}
+                      {dossier?.subscription?.planName || "—"}
                     </dd>
                   </div>
                   <div>
@@ -294,27 +302,29 @@ export function Customer360Drawer({
                   <div>
                     <dt className="text-muted-foreground">Renewal Date</dt>
                     <dd className="mt-0.5 font-medium text-foreground">
-                      {dossier.subscription?.endTime
+                      {dossier?.subscription?.endTime
                         ? formatShortDate(dossier.subscription.endTime)
-                        : "Active cycle"}
+                        : "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">PPPoE Username</dt>
                     <dd className="mt-0.5 font-mono text-foreground">
-                      {dossier.pppoe?.username || `gt_${customer.accountNumber.toLowerCase()}`}
+                      {dossier?.pppoe?.username || "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Framed WAN IP</dt>
                     <dd className="mt-0.5 font-mono text-foreground">
-                      {dossier.pppoe?.currentIp || "10.10.12.45"}
+                      {dossier?.pppoe?.currentIp || "—"}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">ONT Optical RX</dt>
                     <dd className="mt-0.5 font-mono font-semibold text-foreground">
-                      {rxDbm.toFixed(1)} dBm ({opticalHealth.status})
+                      {rxDbm !== null && opticalHealth
+                        ? `${rxDbm.toFixed(1)} dBm (${opticalHealth.status})`
+                        : "—"}
                     </dd>
                   </div>
                 </dl>
@@ -324,66 +334,72 @@ export function Customer360Drawer({
 
           {activeTab === "NETWORK_ONT" && (
             <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-surface p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold">
-                      FTTH GPON ONT &amp; TR-369 USP Telemetry
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {dossier.ont?.vendorModel || "Huawei EchoLife HG8546M"} · Serial{" "}
-                      <span className="font-mono font-semibold text-foreground">
-                        {dossier.ont?.serialNumber || "HWTC8921A4B2"}
-                      </span>
-                    </p>
+              {dossier?.ont && opticalHealth && rxDbm !== null ? (
+                <div className="rounded-lg border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold">
+                        FTTH GPON ONT &amp; TR-369 USP Telemetry
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {dossier.ont.vendorModel} · Serial{" "}
+                        <span className="font-mono font-semibold text-foreground">
+                          {dossier.ont.serialNumber}
+                        </span>
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "rounded-md px-2 py-0.5 text-xs font-semibold",
+                        opticalHealth.badgeTone === "success"
+                          ? "bg-success-soft text-success"
+                          : opticalHealth.badgeTone === "warning"
+                          ? "bg-warning-soft text-warning"
+                          : "bg-danger-soft text-danger"
+                      )}
+                    >
+                      {opticalHealth.label}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-xs font-semibold",
-                      opticalHealth.badgeTone === "success"
-                        ? "bg-success-soft text-success"
-                        : opticalHealth.badgeTone === "warning"
-                        ? "bg-warning-soft text-warning"
-                        : "bg-danger-soft text-danger"
-                    )}
-                  >
-                    {opticalHealth.label}
-                  </span>
-                </div>
 
-                <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs sm:grid-cols-4">
-                  <div>
-                    <dt className="text-muted-foreground">OLT PON Port</dt>
-                    <dd className="mt-0.5 font-mono font-semibold">
-                      {dossier.ont?.ponPortLabel || "GPON 0/1/0:4"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">ONU RX / TX</dt>
-                    <dd className="mt-0.5 font-mono font-semibold">
-                      {rxDbm.toFixed(1)} / {(dossier.ont?.txPowerDbm ?? 2.3).toFixed(1)} dBm
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Fiber Distance</dt>
-                    <dd className="mt-0.5 font-mono">
-                      {dossier.ont?.distanceMeters ?? 1180} m (VLAN{" "}
-                      {dossier.ont?.serviceVlan ?? 210})
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Wi-Fi SSID / Hosts</dt>
-                    <dd className="mt-0.5 font-mono">
-                      {dossier.ont?.wifiSsid || "Home_5G"} ({dossier.ont?.connectedClients ?? 5})
-                    </dd>
-                  </div>
-                </dl>
+                  <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs sm:grid-cols-4">
+                    <div>
+                      <dt className="text-muted-foreground">OLT PON Port</dt>
+                      <dd className="mt-0.5 font-mono font-semibold">
+                        {dossier.ont.ponPortLabel}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">ONU RX / TX</dt>
+                      <dd className="mt-0.5 font-mono font-semibold">
+                        {rxDbm.toFixed(1)} / {dossier.ont.txPowerDbm.toFixed(1)} dBm
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Fiber Distance</dt>
+                      <dd className="mt-0.5 font-mono">
+                        {dossier.ont.distanceMeters} m (VLAN{" "}
+                        {dossier.ont.serviceVlan})
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Wi-Fi SSID / Hosts</dt>
+                      <dd className="mt-0.5 font-mono">
+                        {dossier.ont.wifiSsid || "—"} ({dossier.ont.connectedClients})
+                      </dd>
+                    </div>
+                  </dl>
 
-                <div className="mt-3 rounded border border-border bg-surface-subtle p-2.5 text-xs text-muted-foreground">
-                  <Wifi className="mr-1.5 inline h-3.5 w-3.5 text-primary" />
-                  {opticalHealth.recommendation}
+                  <div className="mt-3 rounded border border-border bg-surface-subtle p-2.5 text-xs text-muted-foreground">
+                    <Wifi className="mr-1.5 inline h-3.5 w-3.5 text-primary" />
+                    {opticalHealth.recommendation}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-surface p-6 text-center text-xs text-muted-foreground">
+                  No ONT optical telemetry or active PPPoE session bound to this subscriber yet.
+                </div>
+              )}
 
               {/* Remote Control Actions */}
               <div className="rounded-lg border border-border bg-surface p-4">
@@ -445,13 +461,13 @@ export function Customer360Drawer({
                   </span>
                 </div>
 
-                {dossier.journalEntries.length === 0 ? (
+                {(dossier?.journalEntries ?? []).length === 0 ? (
                   <p className="mt-2 text-xs text-muted-foreground">
                     No posted journal entries for this subscriber yet.
                   </p>
                 ) : (
                   <div className="mt-3 space-y-2.5">
-                    {dossier.journalEntries.map((je) => (
+                    {(dossier?.journalEntries ?? []).map((je) => (
                       <div
                         key={je.id}
                         className="rounded-md border border-border bg-surface-subtle p-3 text-xs"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Sparkles,
   Send,
@@ -18,10 +18,20 @@ import {
 import { buildSeedCopilotSnapshot } from "@/lib/db/os-2027-seed";
 import { useAuth } from "@/lib/auth/auth-context";
 
-const QUICK_PROMPTS = [
+const DEMO_QUICK_PROMPTS = [
   "Who is our newest subscriber?",
   "How many active subscribers do we have?",
   "Why is David Koech (GT-8923) offline?",
+  "Which customers owe us the most?",
+  "How much did we collect today?",
+  "Which router has the most active sessions?",
+  "How is the business performing?",
+  "What can QC NetCore do?",
+];
+
+const LIVE_QUICK_PROMPTS = [
+  "Who is our newest subscriber?",
+  "How many active subscribers do we have?",
   "Which customers owe us the most?",
   "How much did we collect today?",
   "Which router has the most active sessions?",
@@ -43,6 +53,7 @@ export function AiOperationsCopilotDrawer({
   const [history, setHistory] = useState<
     Array<{ query: string; response: CopilotResponse }>
   >(() => {
+    if (!isDemoMode) return [];
     const snap = buildSeedCopilotSnapshot();
     return [
       {
@@ -55,7 +66,23 @@ export function AiOperationsCopilotDrawer({
     {}
   );
 
+  useEffect(() => {
+    if (isDemoMode) {
+      const snap = buildSeedCopilotSnapshot();
+      setHistory([
+        {
+          query: "Operational system status brief",
+          response: runCopilotQuery("General operations brief", snap),
+        },
+      ]);
+    } else {
+      setHistory([]);
+    }
+  }, [isDemoMode]);
+
   if (!open) return null;
+
+  const quickPrompts = isDemoMode ? DEMO_QUICK_PROMPTS : LIVE_QUICK_PROMPTS;
 
   const handleAsk = async (qText: string) => {
     const trimmed = qText.trim();
@@ -85,14 +112,31 @@ export function AiOperationsCopilotDrawer({
         return;
       }
     } catch {
-      // Fallback to local execution if offline
+      // Fallback only in demo mode
     }
 
-    const fallbackRes = runCopilotQuery(trimmed, undefined, memory);
-    if (fallbackRes.conversationContext) {
-      setMemory(fallbackRes.conversationContext);
+    if (isDemoMode) {
+      const fallbackRes = runCopilotQuery(trimmed, undefined, memory);
+      if (fallbackRes.conversationContext) {
+        setMemory(fallbackRes.conversationContext);
+      }
+      setHistory((prev) => [{ query: trimmed, response: fallbackRes }, ...prev]);
+    } else {
+      setHistory((prev) => [
+        {
+          query: trimmed,
+          response: {
+            intent: "GENERAL_OPERATIONS_BRIEF",
+            headline: "Unable to Reach Live Operations API",
+            answerMarkdown:
+              "Could not retrieve live workspace telemetry at this moment. Please verify your connection and try again.",
+            metricsCited: [],
+            proposedActions: [],
+          },
+        },
+        ...prev,
+      ]);
     }
-    setHistory((prev) => [{ query: trimmed, response: fallbackRes }, ...prev]);
     setIsLoading(false);
   };
 
@@ -145,7 +189,7 @@ export function AiOperationsCopilotDrawer({
             Suggested questions:
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_PROMPTS.map((qp) => (
+            {quickPrompts.map((qp) => (
               <button
                 key={qp}
                 type="button"
@@ -160,6 +204,11 @@ export function AiOperationsCopilotDrawer({
 
         {/* Conversation Responses */}
         <div className="flex-1 space-y-4 overflow-y-auto p-4 text-xs">
+          {history.length === 0 ? (
+            <div className="rounded-lg border border-border bg-surface-subtle p-4 text-center text-muted-foreground">
+              Ask a question above or select a suggested prompt to inspect your live ISP workspace data.
+            </div>
+          ) : null}
           {history.map((item, idx) => (
             <div
               key={`${item.query}-${idx}`}

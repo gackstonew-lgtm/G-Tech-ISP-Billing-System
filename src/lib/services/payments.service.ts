@@ -34,7 +34,7 @@ export class PaymentsService {
   static async list(options: { customerId?: string; limit?: number; isDemo?: boolean } = {}): Promise<ServiceResult<Payment[]>> {
     const isDemo = await this.checkIsDemo(options.isDemo);
 
-    if (isDemo || !SUPABASE_READY) {
+    if (isDemo) {
       let data = [...SEED_PAYMENTS];
       if (options.customerId) {
         data = data.filter((p) => p.customerId === options.customerId);
@@ -42,9 +42,27 @@ export class PaymentsService {
       return { data, error: null, count: data.length };
     }
 
+    if (!SUPABASE_READY) {
+      return { data: [], error: null, count: 0 };
+    }
+
     try {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let orgId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id ?? undefined;
+      }
 
       let query = supabase
         .from("payments")
@@ -52,6 +70,9 @@ export class PaymentsService {
         .order("created_at", { ascending: false })
         .limit(options.limit ?? 100);
 
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
       if (options.customerId) {
         query = query.eq("customer_id", options.customerId);
       }
@@ -75,9 +96,16 @@ export class PaymentsService {
     const days: RevenuePeriod = options.days === 30 ? 30 : 7;
     const isDemo = await this.checkIsDemo(options.isDemo);
 
-    if (isDemo || !SUPABASE_READY) {
+    if (isDemo) {
       return {
         data: aggregateRevenueByDay(SEED_PAYMENTS, days),
+        error: null,
+      };
+    }
+
+    if (!SUPABASE_READY) {
+      return {
+        data: aggregateRevenueByDay([], days),
         error: null,
       };
     }
@@ -86,15 +114,35 @@ export class PaymentsService {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();
 
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let orgId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id ?? undefined;
+      }
+
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - (days + 2));
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("payments")
         .select("amount, status, processed_at, created_at")
         .eq("status", "COMPLETED")
         .gte("created_at", cutoff.toISOString())
         .order("created_at", { ascending: true });
+
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         const appError = handleSupabaseError(error, "payments.revenueByDay");

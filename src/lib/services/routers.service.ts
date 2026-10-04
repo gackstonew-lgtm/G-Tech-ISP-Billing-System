@@ -52,27 +52,53 @@ export class RoutersService {
   static async list(isDemoParam?: boolean): Promise<ServiceResult<Router[]>> {
     const isDemo = await this.checkIsDemo(isDemoParam);
 
-    if (isDemo || !SUPABASE_READY) {
+    if (isDemo) {
       return { data: SEED_ROUTERS, error: null, count: SEED_ROUTERS.length };
+    }
+
+    if (!SUPABASE_READY) {
+      return { data: [], error: null, count: 0 };
     }
 
     try {
       const { createSupabaseServerClient } = await import("@/lib/supabase/server");
       const supabase = await createSupabaseServerClient();
 
-      const { data, error, count } = await supabase
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      let orgId: string | undefined;
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        orgId = profile?.organization_id ?? undefined;
+      }
+
+      let query = supabase
         .from("routers")
         .select(SAFE_ROUTER_COLUMNS, { count: "exact" })
         .order("name", { ascending: true });
 
-      if (error || !data) {
-        return { data: SEED_ROUTERS, error: null, count: SEED_ROUTERS.length };
+      if (orgId) {
+        query = query.eq("organization_id", orgId);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        const appError = handleSupabaseError(error, "routers.list");
+        return { data: null, error: appError.userMessage };
       }
 
       const routers: Router[] = (data as unknown as Record<string, unknown>[] ?? []).map(mapRouterRow);
       return { data: routers, error: null, count: count ?? routers.length };
     } catch (err) {
-      return { data: SEED_ROUTERS, error: null, count: SEED_ROUTERS.length };
+      const appError = handleSupabaseError(err, "routers.list");
+      return { data: null, error: appError.userMessage };
     }
   }
 

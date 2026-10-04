@@ -19,7 +19,7 @@ export async function GET() {
   const cookieStore = await cookies();
   const isDemo = cookieStore.get("gtech_demo_mode")?.value === "true";
 
-  if (isDemo || !SUPABASE_READY) {
+  if (isDemo) {
     const state = getOrCreateTenantSmsState(SEED_ORGANIZATION.id, true);
     const saved = state.userPhones.get("demo-operator") ?? {
       phoneNumber: SEED_ORGANIZATION.phone,
@@ -48,6 +48,25 @@ export async function GET() {
     });
   }
 
+  if (!SUPABASE_READY) {
+    return NextResponse.json({
+      success: true,
+      data: {
+        hasPhoneNumber: false,
+        phoneNumber: "",
+        normalizedPhoneNumber: "",
+        countryCode: "+254",
+        formattedDisplay: "Not set",
+        verified: false,
+        verifiedAt: null,
+        smsProviderConfigured: false,
+        promptMessage:
+          "Add your phone number to receive important account and service notifications.",
+        isDemo: false,
+      },
+    });
+  }
+
   try {
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
@@ -68,7 +87,7 @@ export async function GET() {
       .eq("id", user.id)
       .single();
 
-    const orgId = profile?.organization_id || SEED_ORGANIZATION.id;
+    const orgId = profile?.organization_id || `org-user-${user.id}`;
     const state = getOrCreateTenantSmsState(orgId, false);
     const rawPhone =
       profile?.phone_number ||

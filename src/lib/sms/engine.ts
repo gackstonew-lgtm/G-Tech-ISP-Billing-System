@@ -1411,7 +1411,10 @@ export function buildEnrichedSmsRecipients(
       );
     const latestPayment = customerPayments[0];
 
-    const customerInvoices = (data.invoices ?? SEED_INVOICES_2027).filter(
+    const isSeedOrg = organizationId === SEED_ORGANIZATION.id;
+    const customerInvoices = (
+      data.invoices ?? (isSeedOrg ? SEED_INVOICES_2027 : [])
+    ).filter(
       (inv) => inv.organizationId === organizationId && inv.customerId === c.id
     );
     const unpaidInvoice =
@@ -1427,7 +1430,9 @@ export function buildEnrichedSmsRecipients(
           month: "short",
           year: "numeric",
         })
-      : "04 Nov 2026";
+      : isSeedOrg
+      ? "04 Nov 2026"
+      : "—";
 
     const prefs = state.preferences.get(c.id) ?? {
       customerId: c.id,
@@ -1439,7 +1444,7 @@ export function buildEnrichedSmsRecipients(
 
     const speedMbps = plan
       ? Math.round(plan.downloadSpeedKbps / 1024)
-      : 10;
+      : 0;
 
     return {
       customerId: c.id,
@@ -1458,22 +1463,33 @@ export function buildEnrichedSmsRecipients(
       status: c.status,
       serviceType: plan?.serviceType || (pppoe ? "PPPOE" : "HOTSPOT"),
       packageId: plan?.id,
-      packageName: plan?.name || sub?.planName || "Standard Fiber Plan",
+      packageName:
+        plan?.name ||
+        sub?.planName ||
+        (isSeedOrg ? "Standard Fiber Plan" : "—"),
       speedMbps,
-      packagePrice: plan?.price ?? 2500,
+      packagePrice: plan?.price ?? 0,
       siteId: site?.id || c.siteId,
-      popName: site?.name || c.siteName || "Main Fiber POP",
+      popName:
+        site?.name ||
+        c.siteName ||
+        (isSeedOrg ? "Main Fiber POP" : "—"),
       routerId: router?.id || pppoe?.routerId,
-      routerName: router?.name || "Core-BNG-Router",
+      routerName:
+        router?.name || (isSeedOrg ? "Core-BNG-Router" : "—"),
       isOnline: Boolean(pppoe?.isOnline),
       balanceDue: c.balanceDue,
       expiryDate: expiryFormatted,
       daysToExpiry,
-      invoiceNumber: unpaidInvoice?.invoiceNumber || `INV-${c.accountNumber}`,
-      lastPaymentReference: latestPayment?.transactionReference || "N/A",
-      supportContact: data.organization.phone || "+254712345678",
-      paybillNumber: data.organization.businessNumber || "4084200",
-      ispName: data.organization.name || "QC NetCore",
+      invoiceNumber:
+        unpaidInvoice?.invoiceNumber ||
+        (isSeedOrg ? `INV-${c.accountNumber}` : "—"),
+      lastPaymentReference: latestPayment?.transactionReference || "—",
+      supportContact:
+        data.organization.phone || (isSeedOrg ? "+254712345678" : "—"),
+      paybillNumber:
+        data.organization.businessNumber || (isSeedOrg ? "4084200" : "—"),
+      ispName: data.organization.name || "ISP",
       transactionalOptIn: prefs.transactionalSms,
       marketingOptIn: prefs.marketingSms,
       registeredAt: c.createdAt,

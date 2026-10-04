@@ -21,18 +21,65 @@ import {
   getSeedReconciliationQueue,
 } from "@/lib/db/os-2027-seed";
 
+import { cookies } from "next/headers";
+import { loadLiveOrDemoCopilotEnvironment } from "@/lib/ai/live-data-loader";
+
 export async function GET() {
-  const journalEntries = getSeedJournalEntries();
+  const cookieStore = await cookies();
+  const isDemo = cookieStore.get("gtech_demo_mode")?.value === "true";
+
+  if (isDemo) {
+    const journalEntries = getSeedJournalEntries();
+    const trialBalance = computeTrialBalance(journalEntries);
+    const arAging = computeArAgingBuckets(SEED_INVOICES_2027);
+    const executiveMetrics = computeExecutiveRevenueMetrics({
+      customers: SEED_CUSTOMERS.map((c) => ({
+        id: c.id,
+        status: c.status,
+        balanceDue: c.balanceDue,
+        planPrice: 2500,
+      })),
+      payments: SEED_PAYMENTS,
+      trialBalance,
+      arAging,
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        journalEntries,
+        trialBalance,
+        arAging,
+        executiveMetrics,
+        reconciliationQueue: getSeedReconciliationQueue(),
+        approvalRequests: SEED_APPROVAL_REQUESTS,
+        invoices: SEED_INVOICES_2027,
+      },
+    });
+  }
+
+  const env = await loadLiveOrDemoCopilotEnvironment({ explicitDemoMode: false });
+  const journalEntries = env.dataset.journalEntries;
   const trialBalance = computeTrialBalance(journalEntries);
-  const arAging = computeArAgingBuckets(SEED_INVOICES_2027);
+  const liveInvoicesForAging = env.dataset.invoices.map((inv) => ({
+    ...inv,
+    periodStart: inv.createdAt,
+    periodEnd: inv.dueDate,
+    lineItems: [],
+  }));
+  const arAging = computeArAgingBuckets(liveInvoicesForAging);
   const executiveMetrics = computeExecutiveRevenueMetrics({
-    customers: SEED_CUSTOMERS.map((c) => ({
-      id: c.id,
-      status: c.status,
-      balanceDue: c.balanceDue,
-      planPrice: 2500,
-    })),
-    payments: SEED_PAYMENTS,
+    customers: env.dataset.customers.map((c) => {
+      const sub = env.dataset.subscriptions.find((s) => s.customerId === c.id);
+      const plan = env.dataset.plans.find((p) => p.id === sub?.planId);
+      return {
+        id: c.id,
+        status: c.status,
+        balanceDue: c.balanceDue,
+        planPrice: plan?.price ?? 0,
+      };
+    }),
+    payments: env.dataset.payments,
     trialBalance,
     arAging,
   });
@@ -44,9 +91,9 @@ export async function GET() {
       trialBalance,
       arAging,
       executiveMetrics,
-      reconciliationQueue: getSeedReconciliationQueue(),
-      approvalRequests: SEED_APPROVAL_REQUESTS,
-      invoices: SEED_INVOICES_2027,
+      reconciliationQueue: [],
+      approvalRequests: [],
+      invoices: env.dataset.invoices,
     },
   });
 }

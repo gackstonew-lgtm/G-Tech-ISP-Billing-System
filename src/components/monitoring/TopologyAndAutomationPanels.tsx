@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Network,
   Zap,
@@ -17,17 +17,25 @@ import {
   correlateOutageBlastRadius,
   AutomationRule,
 } from "@/lib/network/topology-gis-automation";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export function TopologyAndAutomationPanels() {
+  const { isDemoMode } = useAuth();
   const [selectedNodeId, setSelectedNodeId] = useState<string>("node-rtr-01");
-  const [rules, setRules] = useState<AutomationRule[]>(
-    () => SEED_AUTOMATION_RULES
+  const [rules, setRules] = useState<AutomationRule[]>(() =>
+    isDemoMode ? SEED_AUTOMATION_RULES : []
   );
 
-  const blastRadius = correlateOutageBlastRadius(
-    SEED_TOPOLOGY_NODES,
-    selectedNodeId
-  );
+  useEffect(() => {
+    setRules(isDemoMode ? SEED_AUTOMATION_RULES : []);
+  }, [isDemoMode]);
+
+  const topologyNodes = isDemoMode ? SEED_TOPOLOGY_NODES : [];
+
+  const blastRadius =
+    topologyNodes.length > 0
+      ? correlateOutageBlastRadius(topologyNodes, selectedNodeId)
+      : null;
 
   const toggleRule = (id: string) => {
     setRules((prev) =>
@@ -55,76 +63,86 @@ export function TopologyAndAutomationPanels() {
         </header>
 
         <div className="space-y-3 p-4">
-          <div className="space-y-1.5">
-            {SEED_TOPOLOGY_NODES.map((node) => {
-              const selected = node.id === selectedNodeId;
-              const indent =
-                node.nodeType === "UPSTREAM_TRANSIT"
-                  ? "ml-0"
-                  : node.nodeType === "CORE_ROUTER"
-                  ? "ml-4"
-                  : node.nodeType === "OLT"
-                  ? "ml-8"
-                  : "ml-12";
-              return (
-                <button
-                  key={node.id}
-                  type="button"
-                  onClick={() => setSelectedNodeId(node.id)}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition-colors",
-                    indent,
-                    selected
-                      ? "border-primary bg-primary-soft font-medium text-primary"
-                      : "border-border bg-surface hover:bg-surface-subtle"
-                  )}
-                  style={{
-                    width:
-                      node.nodeType === "UPSTREAM_TRANSIT"
-                        ? "100%"
-                        : node.nodeType === "CORE_ROUTER"
-                        ? "calc(100% - 1rem)"
-                        : node.nodeType === "OLT"
-                        ? "calc(100% - 2rem)"
-                        : "calc(100% - 3rem)",
-                  }}
-                >
-                  <div>
-                    <span className="font-mono text-[11px] opacity-75">
-                      [{node.nodeType}]
-                    </span>{" "}
-                    <span>{node.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {node.subscriberCount} subs · {node.latencyMs}ms
-                    </span>
-                    <StatusBadge status={node.status} />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="rounded-lg border border-warning/30 bg-warning-soft p-3 text-xs">
-            <div className="flex items-center gap-1.5 font-semibold text-warning">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              <span>
-                Blast Radius Analysis: {blastRadius.rootNodeName}
-              </span>
+          {topologyNodes.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted-foreground">
+              No network topology hierarchy nodes configured yet.
             </div>
-            <p className="mt-1 text-foreground">
-              <strong>Impact:</strong> {blastRadius.estimatedAffectedSubscribers}{" "}
-              subscriber(s) across{" "}
-              {blastRadius.affectedDownstreamNodes.length} downstream node(s) ·{" "}
-              <strong>{blastRadius.suppressedChildAlertCount}</strong> child
-              alarms auto-suppressed.
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              <strong>Root Cause Hypothesis:</strong>{" "}
-              {blastRadius.probableRootCause}
-            </p>
-          </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                {topologyNodes.map((node) => {
+                  const selected = node.id === selectedNodeId;
+                  const indent =
+                    node.nodeType === "UPSTREAM_TRANSIT"
+                      ? "ml-0"
+                      : node.nodeType === "CORE_ROUTER"
+                      ? "ml-4"
+                      : node.nodeType === "OLT"
+                      ? "ml-8"
+                      : "ml-12";
+                  return (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={() => setSelectedNodeId(node.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition-colors",
+                        indent,
+                        selected
+                          ? "border-primary bg-primary-soft font-medium text-primary"
+                          : "border-border bg-surface hover:bg-surface-subtle"
+                      )}
+                      style={{
+                        width:
+                          node.nodeType === "UPSTREAM_TRANSIT"
+                            ? "100%"
+                            : node.nodeType === "CORE_ROUTER"
+                            ? "calc(100% - 1rem)"
+                            : node.nodeType === "OLT"
+                            ? "calc(100% - 2rem)"
+                            : "calc(100% - 3rem)",
+                      }}
+                    >
+                      <div>
+                        <span className="font-mono text-[11px] opacity-75">
+                          [{node.nodeType}]
+                        </span>{" "}
+                        <span>{node.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {node.subscriberCount} subs · {node.latencyMs}ms
+                        </span>
+                        <StatusBadge status={node.status} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {blastRadius && (
+                <div className="rounded-lg border border-warning/30 bg-warning-soft p-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-warning">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>
+                      Blast Radius Analysis: {blastRadius.rootNodeName}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-foreground">
+                    <strong>Impact:</strong> {blastRadius.estimatedAffectedSubscribers}{" "}
+                    subscriber(s) across{" "}
+                    {blastRadius.affectedDownstreamNodes.length} downstream node(s) ·{" "}
+                    <strong>{blastRadius.suppressedChildAlertCount}</strong> child
+                    alarms auto-suppressed.
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    <strong>Root Cause Hypothesis:</strong>{" "}
+                    {blastRadius.probableRootCause}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 
@@ -146,43 +164,49 @@ export function TopologyAndAutomationPanels() {
         </header>
 
         <div className="divide-y divide-border-subtle">
-          {rules.map((rule) => (
-            <div
-              key={rule.id}
-              className="flex items-start justify-between gap-3 p-4 text-xs"
-            >
-              <div className="space-y-1">
-                <div className="font-semibold text-foreground">{rule.name}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">
-                  IF <span className="text-primary">{rule.triggerEvent}</span>{" "}
-                  ({rule.conditionSummary}) &rarr;{" "}
-                  <span className="font-semibold text-foreground">
-                    {rule.actionType}
-                  </span>
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Executed {rule.executionCount} times
-                  {rule.lastTriggeredAt &&
-                    ` · Last: ${formatShortDate(rule.lastTriggeredAt)}`}
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={rule.isEnabled}
-                onClick={() => toggleRule(rule.id)}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                  rule.isEnabled
-                    ? "border-success/30 bg-success-soft text-success"
-                    : "border-border bg-surface-subtle text-muted-foreground"
-                )}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {rule.isEnabled ? "Active" : "Paused"}
-              </button>
+          {rules.length === 0 ? (
+            <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+              No automation rules configured yet.
             </div>
-          ))}
+          ) : (
+            rules.map((rule) => (
+              <div
+                key={rule.id}
+                className="flex items-start justify-between gap-3 p-4 text-xs"
+              >
+                <div className="space-y-1">
+                  <div className="font-semibold text-foreground">{rule.name}</div>
+                  <div className="font-mono text-[11px] text-muted-foreground">
+                    IF <span className="text-primary">{rule.triggerEvent}</span>{" "}
+                    ({rule.conditionSummary}) &rarr;{" "}
+                    <span className="font-semibold text-foreground">
+                      {rule.actionType}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Executed {rule.executionCount} times
+                    {rule.lastTriggeredAt &&
+                      ` · Last: ${formatShortDate(rule.lastTriggeredAt)}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={rule.isEnabled}
+                  onClick={() => toggleRule(rule.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
+                    rule.isEnabled
+                      ? "border-success/30 bg-success-soft text-success"
+                      : "border-border bg-surface-subtle text-muted-foreground"
+                  )}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {rule.isEnabled ? "Active" : "Paused"}
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </section>
     </div>

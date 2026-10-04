@@ -39,8 +39,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let organizationId = "org-gtech-kenya-01";
+    try {
+      const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+      const supabase = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (profile?.organization_id) {
+          organizationId = profile.organization_id;
+        }
+      }
+    } catch {
+      // Fallback for isolated demo mode
+    }
+
     const result = await CustomerService.create(
-      "org-gtech-kenya-01", // TODO: derive from authenticated session organization_id
+      organizationId,
       { fullName, phoneNumber, email, physicalAddress, siteId, altPhoneNumber, nationalId }
     );
 
@@ -59,8 +80,7 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     );
-  } catch (err: unknown) {
-    const e = err as Error;
+  } catch {
     return NextResponse.json(
       { success: false, error: "Unable to create customer. Please try again." },
       { status: 500 }

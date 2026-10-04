@@ -1,29 +1,32 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import {
   Wrench,
   Plus,
-  Search,
   CheckCircle2,
-  Clock,
   MapPin,
   Phone,
   User,
-  AlertTriangle,
-  Radio,
   X,
 } from "lucide-react";
-import { SEED_WORK_ORDERS, SEED_USERS } from "@/lib/db/mock-db";
+import { SEED_WORK_ORDERS } from "@/lib/db/mock-db";
 import { WorkOrder, WorkOrderStatus } from "@/types";
-import { formatShortDate } from "@/lib/utils";
-import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
+import { GlassCard, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
 import { FieldInventoryAndSlaPanels } from "@/components/technicians/FieldInventoryAndSlaPanels";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export default function TechniciansPage() {
-  const [orders, setOrders] = useState<WorkOrder[]>(SEED_WORK_ORDERS);
+  const { isDemoMode, user, profile } = useAuth();
+  const [orders, setOrders] = useState<WorkOrder[]>(() =>
+    isDemoMode ? SEED_WORK_ORDERS : []
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    setOrders(isDemoMode ? SEED_WORK_ORDERS : []);
+  }, [isDemoMode]);
 
   // Form State
   const [title, setTitle] = useState("");
@@ -31,8 +34,8 @@ export default function TechniciansPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [description, setDescription] = useState("");
-  const [orderType, setOrderType] = useState<"INSTALLATION" | "REPAIR">("INSTALLATION");
-  const [priority, setPriority] = useState<"NORMAL" | "HIGH" | "CRITICAL">("NORMAL");
+  const [orderType] = useState<"INSTALLATION" | "REPAIR">("INSTALLATION");
+  const [priority] = useState<"NORMAL" | "HIGH" | "CRITICAL">("NORMAL");
 
   const handleUpdateStatus = (id: string, newStatus: WorkOrderStatus) => {
     setOrders((prev) =>
@@ -44,13 +47,13 @@ export default function TechniciansPage() {
     e.preventDefault();
     const newOrder: WorkOrder = {
       id: `wo-${Date.now()}`,
-      organizationId: "org-gtech-kenya-01",
-      ticketNumber: `WO-2025-00${orders.length + 1}`,
+      organizationId: profile?.organization_id || "org-live",
+      ticketNumber: `WO-${new Date().getFullYear()}-00${orders.length + 1}`,
       customerName,
       customerPhone,
       customerAddress,
-      assignedTechnicianId: "user-tech-01",
-      assignedTechnicianName: "Brian Kiprop",
+      assignedTechnicianId: user?.id || "tech-assigned",
+      assignedTechnicianName: profile?.full_name || "Field Technician",
       title,
       description,
       orderType,
@@ -91,79 +94,85 @@ export default function TechniciansPage() {
       </div>
 
       {/* Work Orders Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {orders.map((order) => (
-          <GlassCard key={order.id} className="flex flex-col justify-between" hoverEffect>
-            <GlassCardContent className="p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="font-mono text-xs font-extrabold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
-                    {order.ticketNumber}
-                  </span>
-                  <h3 className="font-extrabold text-foreground text-base mt-2">
-                    {order.title}
-                  </h3>
-                </div>
-                <GlassBadge
-                  variant={
-                    order.priority === "CRITICAL"
-                      ? "destructive"
-                      : order.priority === "HIGH"
-                      ? "warning"
-                      : "neutral"
-                  }
-                  size="sm"
-                >
-                  {order.priority}
-                </GlassBadge>
-              </div>
-
-              <p className="text-xs text-foreground mt-2 leading-relaxed bg-surface-elevated/60 p-3.5 rounded-xl border border-border">
-                {order.description}
-              </p>
-
-              {/* Customer and Location Info */}
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="font-bold text-foreground">{order.customerName}</span>
-                </div>
-                <div className="flex items-center gap-2 font-mono">
-                  <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-foreground">{order.customerPhone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{order.customerAddress}</span>
-                </div>
-              </div>
-            </GlassCardContent>
-
-            {/* Status & Actions */}
-            <div className="p-4 border-t border-border bg-surface-elevated/40 flex items-center justify-between">
-              <div className="text-xs text-muted-foreground">
-                Tech: <span className="font-bold text-primary">{order.assignedTechnicianName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {order.status !== "COMPLETED" ? (
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, "COMPLETED")}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition"
+      {orders.length === 0 ? (
+        <div className="rounded-lg border border-border bg-surface p-8 text-center text-xs text-muted-foreground">
+          No field installations recorded.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {orders.map((order) => (
+            <GlassCard key={order.id} className="flex flex-col justify-between" hoverEffect>
+              <GlassCardContent className="p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="font-mono text-xs font-extrabold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                      {order.ticketNumber}
+                    </span>
+                    <h3 className="font-extrabold text-foreground text-base mt-2">
+                      {order.title}
+                    </h3>
+                  </div>
+                  <GlassBadge
+                    variant={
+                      order.priority === "CRITICAL"
+                        ? "destructive"
+                        : order.priority === "HIGH"
+                        ? "warning"
+                        : "neutral"
+                    }
+                    size="sm"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Mark Done</span>
-                  </button>
-                ) : (
-                  <GlassBadge variant="success" size="sm">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Completed</span>
+                    {order.priority}
                   </GlassBadge>
-                )}
+                </div>
+
+                <p className="text-xs text-foreground mt-2 leading-relaxed bg-surface-elevated/60 p-3.5 rounded-xl border border-border">
+                  {order.description}
+                </p>
+
+                {/* Customer and Location Info */}
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="font-bold text-foreground">{order.customerName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 font-mono">
+                    <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-foreground">{order.customerPhone}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">{order.customerAddress}</span>
+                  </div>
+                </div>
+              </GlassCardContent>
+
+              {/* Status & Actions */}
+              <div className="p-4 border-t border-border bg-surface-elevated/40 flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">
+                  Tech: <span className="font-bold text-primary">{order.assignedTechnicianName}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {order.status !== "COMPLETED" ? (
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, "COMPLETED")}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Mark Done</span>
+                    </button>
+                  ) : (
+                    <GlassBadge variant="success" size="sm">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Completed</span>
+                    </GlassBadge>
+                  )}
+                </div>
               </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
+            </GlassCard>
+          ))}
+        </div>
+      )}
 
       <FieldInventoryAndSlaPanels />
 
