@@ -6,10 +6,7 @@ import {
   Send,
   X,
   CheckCircle2,
-  Terminal,
   ShieldCheck,
-  Database,
-  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { btnClass } from "@/components/ui/PageHeader";
@@ -23,13 +20,13 @@ import { useAuth } from "@/lib/auth/auth-context";
 
 const QUICK_PROMPTS = [
   "Who is our newest subscriber?",
+  "How many active subscribers do we have?",
   "Why is David Koech (GT-8923) offline?",
   "Which customers owe us the most?",
   "How much did we collect today?",
-  "Which package generated the most revenue?",
   "Which router has the most active sessions?",
   "How is the business performing?",
-  "How does PPPoE billing work?",
+  "What can QC NetCore do?",
 ];
 
 export function AiOperationsCopilotDrawer({
@@ -121,20 +118,14 @@ export function AiOperationsCopilotDrawer({
                 <h2 className="text-sm font-semibold">
                   AI ISP Operations Copilot
                 </h2>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold",
-                    isDemoMode
-                      ? "border-primary/30 bg-primary-soft text-primary"
-                      : "border-success/30 bg-success/10 text-success"
-                  )}
-                >
-                  <Database className="h-2.5 w-2.5" />
-                  {isDemoMode ? "DEMO DATA" : "LIVE TENANT DATA"}
-                </span>
+                {isDemoMode && (
+                  <span className="inline-flex items-center rounded border border-primary/30 bg-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    Demo workspace
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Live tool-driven access to Subscribers, Ledger, MikroTik/RADIUS &amp; NOC
+                Ask about subscribers, billing, payments, routers, sessions, and ISP operations
               </p>
             </div>
           </div>
@@ -151,7 +142,7 @@ export function AiOperationsCopilotDrawer({
         {/* Quick Prompts */}
         <div className="border-b border-border bg-surface-subtle p-3">
           <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
-            Ask live operational questions:
+            Suggested questions:
           </div>
           <div className="flex flex-wrap gap-1.5">
             {QUICK_PROMPTS.map((qp) => (
@@ -174,32 +165,11 @@ export function AiOperationsCopilotDrawer({
               key={`${item.query}-${idx}`}
               className="rounded-lg border border-border bg-surface-subtle p-3.5 space-y-3"
             >
-              <div className="flex items-center justify-between gap-2 border-b border-border pb-2">
+              <div className="border-b border-border pb-2">
                 <span className="font-semibold text-primary">
-                  Q: {item.query}
-                </span>
-                <span className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {item.response.intent}
+                  {item.query}
                 </span>
               </div>
-
-              {/* Tools Invoked Traceability Bar */}
-              {item.response.toolsInvoked && item.response.toolsInvoked.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-                    <Wrench className="h-3 w-3 text-primary" />
-                    Tools invoked:
-                  </span>
-                  {item.response.toolsInvoked.map((tName, tIdx) => (
-                    <span
-                      key={`${tName}-${tIdx}`}
-                      className="rounded bg-surface border border-border px-1.5 py-0.5 font-mono text-[10px] text-primary"
-                    >
-                      {tName}()
-                    </span>
-                  ))}
-                </div>
-              )}
 
               <div>
                 <div className="font-semibold text-foreground">
@@ -240,20 +210,13 @@ export function AiOperationsCopilotDrawer({
                     <div className="flex items-center justify-between">
                       <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                        Proposed Action (Requires Operator Confirmation)
+                        Recommended Action
                       </span>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        RBAC: {act.permissionRequired}
-                      </span>
-                    </div>
-                    <div className="font-mono text-[11px] text-muted-foreground">
-                      <Terminal className="mr-1 inline h-3 w-3" />
-                      {act.commandPreview}
                     </div>
                     {confirmed ? (
                       <div className="inline-flex items-center gap-1 text-xs font-semibold text-success">
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        Confirmed &amp; Dispatched to Control Plane
+                        Action confirmed
                       </div>
                     ) : (
                       <button
@@ -266,7 +229,7 @@ export function AiOperationsCopilotDrawer({
                         }
                         className={btnClass("primary", "h-7 px-2.5 text-xs")}
                       >
-                        Confirm: {act.label}
+                        {act.label}
                       </button>
                     )}
                   </div>

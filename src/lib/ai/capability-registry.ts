@@ -1,18 +1,17 @@
 // ============================================================================
 // QC NETCORE — SOFTWARE-AWARENESS LAYER & SYSTEM CAPABILITY REGISTRY
 // ============================================================================
-// Machine-readable map of QC NetCore modules, routes, features, supported
-// actions, required RBAC permissions, authoritative data sources, and
-// implementation-grounded explanations. Prevents the AI Copilot from inventing
-// non-existent routes or unsupported capabilities.
+// Machine-readable map of verified QC NetCore modules, features, supported
+// actions, required RBAC permissions, and user-friendly explanations.
 // ============================================================================
 
-import type { Permission } from "../auth/rbac";
+import type { Permission } from "../auth/rbac.ts";
 
 export interface FeatureCapabilityDefinition {
   id: string;
   featureName: string;
   module: string;
+  navigationSection: string;
   route: string;
   apiEndpoints: string[];
   description: string;
@@ -29,34 +28,46 @@ export interface FeatureCapabilityDefinition {
 export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
   {
     id: "subscriber-management",
-    featureName: "Subscriber & Customer Management",
+    featureName: "Subscriber and Customer Management",
     module: "Customer Management",
+    navigationSection: "Customers and Subscribers section",
     route: "/customers",
     apiEndpoints: ["/api/v1/subscribers-api"],
     description:
-      "End-to-end CRM and subscriber lifecycle management for PPPoE fiber/wireless and Hotspot customers.",
+      "Customer relationship and subscriber lifecycle management for PPPoE broadband and Hotspot accounts.",
     whyItExists:
-      "Centralizes customer identity, account numbers (GT-XXXX), installation addresses, POP site mapping, service status, and account balances in a single multi-tenant repository.",
+      "Centralizes customer contact details, account numbers, installation addresses, POP site assignments, service status, and account balances in one workspace.",
     howItWorks: [
-      "Operators register a subscriber on `/customers` with full name, phone number (normalized for M-Pesa), installation address, and assigned POP site.",
-      "Each subscriber receives a unique account number (e.g., `GT-8921`) used as the M-Pesa Paybill account reference and PPPoE/RADIUS correlation key.",
-      "Subscriber status (`ACTIVE`, `SUSPENDED`, `PENDING_INSTALLATION`, `EXPIRED`, `TERMINATED`) drives automated FreeRADIUS and MikroTik access control.",
+      "Register a subscriber in the Customers section with their full name, phone number, installation address, and assigned POP site.",
+      "Each subscriber receives a unique account number used for M-Pesa Paybill payments and PPPoE account matching.",
+      "Subscriber status (Active, Suspended, Pending Installation, Expired, or Terminated) controls automated FreeRADIUS and MikroTik network access.",
     ],
     availableActions: [
-      "Create new subscriber (`/customers` -> 'Add Subscriber')",
-      "View subscriber profile & Customer 360 dossier",
-      "Search & filter subscribers by status, POP site, name, phone, or account number",
-      "Suspend or reactivate subscriber service",
-      "Assign PPPoE credentials and service plan",
+      "Add a new subscriber profile and assign a service package",
+      "View the complete Customer 360 profile, payment history, and connection quality",
+      "Search and filter subscribers by status, POP site, name, phone number, or account number",
+      "Suspend or reactivate subscriber internet access",
+      "Configure PPPoE username, password, and IP address assignment",
     ],
-    requiredPermissions: ["customers.view", "customers.create", "customers.update", "customers.suspend"],
-    authoritativeDataSources: ["customers", "subscriptions", "pppoe_accounts", "sites"],
-    dependencies: ["Service Plans (`/plans`)", "MikroTik Routers (`/routers`)"],
+    requiredPermissions: [
+      "customers.view",
+      "customers.create",
+      "customers.update",
+      "customers.suspend",
+    ],
+    authoritativeDataSources: [
+      "customers",
+      "subscriptions",
+      "pppoe_accounts",
+      "sites",
+    ],
+    dependencies: ["Service Plans", "MikroTik Routers"],
     configurationRequirements: [
-      "At least one POP Site and one Service Plan should be configured before provisioning active PPPoE subscribers.",
+      "Set up at least one POP site and one service plan before activating PPPoE subscribers.",
     ],
     keywords: [
       "add subscriber",
+      "add a subscriber",
       "create customer",
       "new subscriber",
       "suspend subscriber",
@@ -64,51 +75,76 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "where do i add a subscriber",
       "how do i add a subscriber",
       "how do i suspend a subscriber",
+      "subscriber management",
+      "customer management",
     ],
   },
   {
     id: "pppoe-billing",
-    featureName: "PPPoE Broadband Billing & Provisioning",
-    module: "Services & Billing",
+    featureName: "PPPoE Broadband Billing and Provisioning",
+    module: "Services and Billing",
+    navigationSection: "Service Plans and Billing sections",
     route: "/plans",
-    apiEndpoints: ["/api/v1/service-plans", "/api/v1/subscribers-api", "/api/v1/mpesa-callback"],
+    apiEndpoints: [
+      "/api/v1/service-plans",
+      "/api/v1/subscribers-api",
+      "/api/v1/mpesa-callback",
+    ],
     description:
-      "Automated recurring billing, bandwidth rate-limiting, and RADIUS/MikroTik session control for home and business PPPoE subscribers.",
+      "PPPoE billing allows you to create internet packages, assign them to subscribers, provision their PPPoE accounts, collect payments, and automatically manage their service access.",
     whyItExists:
-      "Eliminates manual WinBox queue creation and spreadsheet expiry tracking by linking subscriber invoices and M-Pesa payments directly to FreeRADIUS and MikroTik RouterOS.",
+      "Eliminates manual router queue configuration and spreadsheet tracking by linking subscriber invoices and M-Pesa payments directly to FreeRADIUS and MikroTik routers.",
     howItWorks: [
-      "1. Plan Definition (`/plans`): Operators define PPPoE plans with download/upload speeds (Kbps), optional burst thresholds, validity duration (e.g., 30 days), and price in KES.",
-      "2. MikroTik Rate-Limit Synthesis: QC NetCore automatically generates the deterministic RouterOS `Mikrotik-Rate-Limit` attribute string (e.g., `5120k/10240k`).",
-      "3. Subscriber Assignment (`/customers`): A PPPoE account (`pppoe_accounts`) links the customer to a router, username, IP pool or static IP, and service plan.",
-      "4. Billing & M-Pesa Renewal (`/billing`): When a subscriber pays via M-Pesa STK Push or Paybill C2B using their account number (`GT-XXXX`), QC NetCore reconciles the invoice, posts a balanced double-entry journal entry, extends subscription `end_time`, and triggers RADIUS CoA / RouterOS reconnection.",
-      "5. Automated Expiry Suspension: When `end_time` + grace period elapses with an unpaid balance, the subscription transitions to `SUSPENDED` and active PPPoE sessions are disconnected via RFC 5176 CoA.",
+      "Create service plans with download and upload speeds, optional burst limits, validity duration, and price.",
+      "Assign customers to a plan and connect their PPPoE account through your configured MikroTik and FreeRADIUS infrastructure.",
+      "When payment is received via M-Pesa STK Push or Paybill, the billing system updates the customer account, records the payment in the ledger, and extends or restores service automatically.",
+      "When a subscription expires past the configured grace period with an unpaid balance, the account is suspended and active PPPoE sessions are disconnected automatically.",
     ],
     availableActions: [
-      "Create and edit PPPoE service plans (`/plans`)",
-      "Provision PPPoE credentials and static/pool IPs (`/customers`)",
-      "Issue invoices and trigger M-Pesa STK Push renewals (`/billing`)",
-      "Reset PPPoE sessions via RADIUS CoA disconnect",
+      "Create and update PPPoE and Hotspot service plans",
+      "Assign speed limits, burst thresholds, and billing validity periods",
+      "Provision subscriber PPPoE accounts and static or pool IP addresses",
+      "Issue invoices and send M-Pesa STK Push payment prompts",
+      "Reset active PPPoE sessions when troubleshooting subscriber links",
     ],
-    requiredPermissions: ["plans.view", "plans.modify", "customers.view", "billing.view"],
-    authoritativeDataSources: ["plans", "subscriptions", "pppoe_accounts", "invoices", "payments"],
-    dependencies: ["FreeRADIUS AAA", "MikroTik RouterOS API / WireGuard", "M-Pesa Daraja API"],
+    requiredPermissions: [
+      "plans.view",
+      "plans.modify",
+      "customers.view",
+      "billing.view",
+    ],
+    authoritativeDataSources: [
+      "plans",
+      "subscriptions",
+      "pppoe_accounts",
+      "invoices",
+      "payments",
+    ],
+    dependencies: [
+      "FreeRADIUS authentication and accounting",
+      "MikroTik RouterOS management",
+      "M-Pesa payment integration",
+    ],
     configurationRequirements: [
-      "Configure PPPoE plans on `/plans`, connect a MikroTik BNG router on `/routers`, and set M-Pesa Paybill/Till settings on `/settings`.",
+      "Create PPPoE plans in the Service Plans section, connect a MikroTik router in the Routers section, and configure M-Pesa Paybill or Till details in Settings.",
     ],
     keywords: [
       "pppoe billing",
       "how does pppoe billing work",
+      "can i manage pppoe billing",
       "pppoe",
       "create a package",
       "how do i create a package",
       "service plan",
       "rate limit",
+      "packages",
     ],
   },
   {
     id: "hotspot-vouchers-captive",
-    featureName: "Hotspot Billing, Vouchers & Multi-Tenant Captive Portal",
-    module: "Hotspot & WiFi Marketing",
+    featureName: "Hotspot Billing, Vouchers, and Customizable Captive Portal",
+    module: "Hotspot and Captive Portal",
+    navigationSection: "Captive Portal Settings and Vouchers sections",
     route: "/settings/captive-portal",
     apiEndpoints: [
       "/api/v1/captive/config",
@@ -117,25 +153,37 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "/api/v1/mpesa-stk-push",
     ],
     description:
-      "Customizable multi-tenant Hotspot Captive Portal (`/captive`) with instant M-Pesa STK Push package checkout and prepaid voucher batch management (`/vouchers`).",
+      "Customizable multi-tenant Hotspot Captive Portal with instant M-Pesa package checkout and prepaid voucher batch generation.",
     whyItExists:
-      "Allows every onboarded ISP to brand its own hotspot login portal, sell time/data-bound Wi-Fi packages (Daily Basic, Weekly Plus, Monthly Pro), and authenticate users via Voucher, M-Pesa, or Account login.",
+      "Allows every ISP to brand its own hotspot login page, display internet packages, and authenticate hotspot users through vouchers, M-Pesa payments, or account credentials.",
     howItWorks: [
-      "1. Captive Portal Customization (`/settings/captive-portal`): ISP admins customize business name, logo, colors, layout template, welcome text, login methods, and featured hotspot packages with live mobile/desktop preview.",
-      "2. Subscriber Portal Experience (`/captive`): Hotspot users connect to Wi-Fi and are redirected by the MikroTik Hotspot Walled Garden to `/captive`.",
-      "3. Instant M-Pesa Checkout or Voucher Entry: Users either enter a prepaid voucher code generated on `/vouchers` or select a package and pay via M-Pesa STK Push.",
-      "4. Session Activation: Upon payment callback or valid voucher verification, FreeRADIUS/MikroTik authorizes the device MAC/IP for the package's exact duration and speed limit.",
+      "Customize your hotspot portal branding, logo, colors, layout template, welcome message, login options, and displayed packages in the Captive Portal settings section.",
+      "Hotspot users connecting to Wi-Fi are presented with your branded captive portal page.",
+      "Customers can enter a prepaid voucher code generated in the Vouchers section or select a hotspot package and pay via M-Pesa.",
+      "Once payment or voucher verification succeeds, the hotspot session is authorized for the selected package duration and speed limit.",
     ],
     availableActions: [
-      "Customize Captive Portal branding, templates, and packages (`/settings/captive-portal`)",
-      "Preview live Captive Portal (`/captive`)",
-      "Generate and export prepaid voucher batches (`/vouchers`)",
+      "Customize captive portal branding, colors, layout, and featured packages",
+      "Preview the captive portal across mobile and desktop layouts",
+      "Generate and export prepaid hotspot voucher batches",
+      "Track voucher usage, active hotspot sessions, and expiration times",
     ],
-    requiredPermissions: ["org.manage", "vouchers.view", "vouchers.generate", "plans.view"],
-    authoritativeDataSources: ["organizations", "plans", "voucher_batches", "hotspot_vouchers", "payments"],
-    dependencies: ["MikroTik Hotspot Profile", "M-Pesa Express STK Push"],
+    requiredPermissions: [
+      "org.manage",
+      "vouchers.view",
+      "vouchers.generate",
+      "plans.view",
+    ],
+    authoritativeDataSources: [
+      "organizations",
+      "plans",
+      "voucher_batches",
+      "hotspot_vouchers",
+      "payments",
+    ],
+    dependencies: ["MikroTik Hotspot configuration", "M-Pesa Express STK Push"],
     configurationRequirements: [
-      "Configure portal branding at `/settings/captive-portal` and Hotspot plans at `/plans` or `/vouchers`.",
+      "Configure portal branding in the Captive Portal settings section and define Hotspot packages in the Service Plans or Vouchers section.",
     ],
     keywords: [
       "captive portal",
@@ -145,12 +193,14 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "hotspot voucher",
       "vouchers",
       "hotspot billing",
+      "hotspot",
     ],
   },
   {
     id: "payment-reconciliation-ledger",
-    featureName: "Payment Reconciliation & Double-Entry Financial Ledger",
-    module: "Billing & Financial Intelligence",
+    featureName: "M-Pesa Payments, Reconciliation, and Financial Ledger",
+    module: "Billing and Financial Management",
+    navigationSection: "Billing and Finance section",
     route: "/billing",
     apiEndpoints: [
       "/api/v1/payments",
@@ -160,22 +210,21 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "/api/v1/mpesa-callback",
     ],
     description:
-      "Automated M-Pesa STK Push & Paybill C2B payment matching, suspense handling for unmatched payments, Maker-Checker approvals, and balanced double-entry accounting.",
+      "Automated M-Pesa STK Push and Paybill payment collection, invoice reconciliation, unmatched payment resolution, and double-entry financial accounting.",
     whyItExists:
-      "Prevents revenue leakage, duplicate transaction crediting, and unallocated mobile money transfers while maintaining an auditable Trial Balance and Accounts Receivable (AR) aging ledger.",
+      "Prevents unallocated mobile money payments and duplicate transaction credits while maintaining accurate customer balances, accounts receivable aging, and a balanced financial ledger.",
     howItWorks: [
-      "1. Incoming Payment Ingestion (`/api/v1/mpesa-callback`): Receives M-Pesa Express or C2B Paybill callbacks with transaction reference, amount, MSISDN phone, and account reference.",
-      "2. Deterministic Matching (`reconcileIncomingPayment`): Matches payments by exact account number (`GT-XXXX`) or normalized subscriber phone number against open invoices.",
-      "3. Classification: Classifies each transaction as `MATCHED`, `OVERPAYMENT` (credits subscriber balance), `PARTIAL` (reduces balance due), `DUPLICATE` (idempotently ignored), or `UNMATCHED` (routed to Suspense Account `2150` for operator review on `/billing`).",
-      "4. Double-Entry Posting (`/api/v1/ledger`): Posts balanced debit/credit journal entries across Cash/M-Pesa (`1010`), Accounts Receivable (`1100`), Subscription Revenue (`4000`), Hotspot Revenue (`4010`), and VAT Payable (`2200`).",
-      "5. Maker-Checker Governance: Refunds or waivers above threshold require dual authorization (`approvals.request` + `approvals.decide`).",
+      "Incoming M-Pesa STK Push and Paybill payments are matched automatically using the customer account number or registered phone number.",
+      "Matched payments update the customer invoice, clear overdue balances, post balanced ledger entries, and trigger automatic service renewal.",
+      "Unmatched or partial payments are placed in the reconciliation queue in the Billing section so finance staff can review and allocate them safely.",
+      "Refunds and credit waivers above policy thresholds use dual approval controls.",
     ],
     availableActions: [
-      "View invoices, payments, and AR aging buckets (`/billing`)",
-      "Reconcile unmatched/suspense M-Pesa payments (`/billing`)",
-      "Trigger M-Pesa STK Push prompt (`/billing` or `/customers`)",
-      "Inspect balanced double-entry journal entries and Trial Balance (`/billing`)",
-      "Request or approve credit notes/waivers",
+      "View customer invoices, payment history, and overdue balances in the Billing section",
+      "Reconcile unmatched M-Pesa payments from the reconciliation queue",
+      "Send M-Pesa STK Push payment requests to subscribers",
+      "Review double-entry ledger entries, trial balance, and accounts receivable aging",
+      "Submit or approve credit adjustments and waivers",
     ],
     requiredPermissions: [
       "billing.view",
@@ -186,10 +235,15 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "approvals.request",
       "approvals.decide",
     ],
-    authoritativeDataSources: ["invoices", "payments", "journal_entries", "approval_requests"],
-    dependencies: ["Safaricom Daraja M-Pesa API", "Customer Account Numbers"],
+    authoritativeDataSources: [
+      "invoices",
+      "payments",
+      "journal_entries",
+      "approval_requests",
+    ],
+    dependencies: ["M-Pesa integration", "Customer account numbers"],
     configurationRequirements: [
-      "Configure organization currency, billing cycle, and M-Pesa Paybill/Till credentials in `/settings`.",
+      "Configure your organization currency, billing cycle, and M-Pesa Paybill or Till settings in the Settings section.",
     ],
     keywords: [
       "reconcile",
@@ -200,70 +254,102 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "trial balance",
       "invoices",
       "mpesa",
+      "m-pesa",
+      "can i use m-pesa",
+      "can i use mpesa",
+      "paybill",
     ],
   },
   {
     id: "mikrotik-noc-monitoring",
-    featureName: "MikroTik Router Fleet, GPON OLT & NOC Monitoring",
-    module: "Network & NOC",
+    featureName: "MikroTik Router Fleet and NOC Network Monitoring",
+    module: "Network Operations",
+    navigationSection: "Routers and Network Monitoring sections",
     route: "/routers",
     apiEndpoints: ["/api/v1/mikrotik-fleet", "/api/v1/monitoring/noc"],
     description:
-      "Centralized management and real-time health telemetry for MikroTik RouterOS BNG routers (`/routers`), GPON OLTs/ONTs, interface traffic, and NOC topology blast-radius correlation (`/monitoring`).",
+      "Centralized management and real-time health monitoring for MikroTik routers, FreeRADIUS sessions, optical signal levels, interface traffic, and network alerts.",
     whyItExists:
-      "Gives network engineers real-time visibility into router CPU/RAM/uptime, active PPPoE & Hotspot session counts, optical dBm attenuation, and outage blast radius across POP sites.",
+      "Gives network operators real-time visibility into router health, CPU and memory load, active PPPoE and Hotspot sessions, optical power levels, and affected subscribers during outages.",
     howItWorks: [
-      "1. Router Onboarding (`/routers`): Connect MikroTik routers via WireGuard VPN tunnel or restricted RouterOS API port.",
-      "2. Telemetry Polling (`/dashboard` & `/routers`): Tracks router status (`ONLINE`, `OFFLINE`, `DEGRADED`), CPU load %, free RAM, uptime, and active session counts.",
-      "3. Live NOC & Topology (`/monitoring`): Streams open network alerts, interface RX/TX throughput and error counters, GPON OLT/ONT optical signal power (`rxPowerDbm`), and correlates parent-child topology nodes to identify outage blast radius.",
+      "Add and connect MikroTik routers in the Routers section using WireGuard VPN or management IP connectivity.",
+      "Monitor router availability, CPU load, memory usage, uptime, and active subscriber sessions from the Routers and Dashboard sections.",
+      "Use the Network Monitoring section to track active network alerts, interface traffic, optical signal alerts, and downstream outage impact across POP sites.",
     ],
     availableActions: [
-      "Add, view, and manage MikroTik routers (`/routers`)",
-      "Inspect router CPU, RAM, uptime, and active sessions (`/dashboard` and `/routers`)",
-      "Monitor open NOC alerts, interface traffic, and topology blast radius (`/monitoring`)",
+      "Add, configure, and monitor MikroTik routers in the Routers section",
+      "Generate RouterOS and WireGuard provisioning scripts",
+      "Inspect router CPU, memory, uptime, and connected PPPoE sessions",
+      "Monitor live network alerts, interface throughput, and outage impact in the Network Monitoring section",
     ],
-    requiredPermissions: ["routers.view", "routers.manage", "routers.provision", "noc.view", "olt.manage"],
-    authoritativeDataSources: ["routers", "sites", "network_alerts", "olts", "onts", "topology_nodes"],
-    dependencies: ["WireGuard VPN Tunnel", "MikroTik RouterOS v7 API", "SNMP / OLT Poller"],
+    requiredPermissions: [
+      "routers.view",
+      "routers.manage",
+      "routers.provision",
+      "noc.view",
+      "olt.manage",
+    ],
+    authoritativeDataSources: [
+      "routers",
+      "sites",
+      "network_alerts",
+      "olts",
+      "onts",
+      "topology_nodes",
+    ],
+    dependencies: ["WireGuard VPN or RouterOS management connectivity"],
     configurationRequirements: [
-      "Register POP site and router management IP / WireGuard public key on `/routers`.",
+      "Register your POP site and MikroTik router details in the Routers section.",
     ],
     keywords: [
       "connect a mikrotik router",
       "how do i connect a mikrotik router",
+      "can i manage mikrotik routers",
+      "mikrotik",
       "where can i view router health",
       "where can i see active sessions",
       "noc metric",
       "what does this noc metric mean",
       "router health",
       "monitoring",
+      "freeradius",
     ],
   },
   {
     id: "field-operations-inventory",
-    featureName: "Field Technician Work Orders, SLA Tickets & Inventory",
-    module: "Field Operations & Inventory",
+    featureName: "Field Operations, Work Orders, Support Tickets, and Inventory",
+    module: "Field Operations",
+    navigationSection: "Technicians and Field Operations section",
     route: "/technicians",
     apiEndpoints: [],
     description:
-      "Dispatch and tracking for fiber installations, splice repairs, SLA support tickets, and serialized CPE/ONT warehouse inventory.",
+      "Field technician dispatch, installation and repair work orders, optical signal verification, SLA support tickets, and equipment inventory tracking.",
     whyItExists:
-      "Coordinates field technicians with NOC optical alarms and new subscriber installations while tracking ONTs, drop fiber, and splitters from warehouse to subscriber premises.",
+      "Coordinates field technicians with network alerts and new installations while tracking routers, ONTs, and fiber equipment from warehouse stock to customer premises.",
     howItWorks: [
-      "Work orders (`INSTALLATION`, `REPAIR`, `SITE_MAINTENANCE`) are assigned to technicians on `/technicians` with priority and scheduled dates.",
-      "Automated NOC rules can raise critical field splice tickets when an ONT reports optical loss of signal (`LOS` / `<-27.0 dBm`).",
-      "Inventory items and serialized assets track MAC addresses and serial numbers assigned to each subscriber.",
+      "Create and assign installation, repair, or maintenance work orders to field technicians in the Technicians section.",
+      "Record optical signal measurements and installation sign-off details when completing field jobs.",
+      "Track customer support tickets, SLA response timers, and warehouse equipment stock levels in one place.",
     ],
     availableActions: [
-      "View and dispatch technician work orders (`/technicians`)",
-      "Track SLA support tickets and escalations",
-      "Audit warehouse stock levels and serialized ONT assignments",
+      "Create and dispatch technician work orders in the Technicians section",
+      "Track support tickets and SLA deadlines",
+      "Manage warehouse stock levels and assigned customer equipment",
     ],
-    requiredPermissions: ["work_orders.view", "work_orders.update", "inventory.manage"],
-    authoritativeDataSources: ["work_orders", "support_tickets", "inventory_items", "serialized_assets"],
-    dependencies: ["Customer Records", "NOC Optical Alarms"],
+    requiredPermissions: [
+      "work_orders.view",
+      "work_orders.update",
+      "inventory.manage",
+    ],
+    authoritativeDataSources: [
+      "work_orders",
+      "support_tickets",
+      "inventory_items",
+      "serialized_assets",
+    ],
+    dependencies: ["Customer records", "Network alerts"],
     configurationRequirements: [
-      "Assign staff profiles with the `technician` role in `/settings`.",
+      "Assign technician roles to field staff in the Settings section.",
     ],
     keywords: [
       "work order",
@@ -275,29 +361,79 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
     ],
   },
   {
+    id: "customer-self-care-portal",
+    featureName: "Customer Self-Care Portal",
+    module: "Customer Experience",
+    navigationSection: "Customer Self-Care Portal",
+    route: "/portal",
+    apiEndpoints: ["/api/v1/mpesa-stk-push"],
+    description:
+      "Self-service subscriber portal where customers can check their active package, view expiry dates, make M-Pesa renewals, review invoices, and request support.",
+    whyItExists:
+      "Reduces support calls by allowing subscribers to check their account status, renew subscriptions via M-Pesa, and download invoices at any time.",
+    howItWorks: [
+      "Subscribers open the Customer Portal to view their current plan, connection status, speed tier, and expiration date.",
+      "Customers can initiate an instant M-Pesa STK Push payment to renew their subscription or clear an outstanding balance.",
+      "Customers can view past invoices, payment receipts, and submit support requests.",
+    ],
+    availableActions: [
+      "View active internet package, speed, and subscription expiry date",
+      "Pay and renew service immediately via M-Pesa",
+      "View invoices and payment history",
+      "Submit and track support tickets",
+    ],
+    requiredPermissions: ["portal.access"],
+    authoritativeDataSources: ["customers", "subscriptions", "invoices", "payments"],
+    dependencies: ["M-Pesa STK Push", "Subscriber account records"],
+    configurationRequirements: [
+      "Available automatically for registered subscribers.",
+    ],
+    keywords: [
+      "self-care",
+      "self care",
+      "customer portal",
+      "subscriber portal",
+      "customer self-care",
+    ],
+  },
+  {
     id: "system-settings-security",
-    featureName: "Organization Settings, RBAC & Security Audit",
-    module: "Configuration & Security",
+    featureName: "Organization Settings, Role Permissions, and Security Audit",
+    module: "Configuration and Security",
+    navigationSection: "Settings section",
     route: "/settings",
     apiEndpoints: ["/api/v1/settings"],
     description:
-      "Tenant-wide configuration for business identity, billing cycle, grace periods, M-Pesa gateway settings, Role-Based Access Control (RBAC), and SOC/audit logs.",
+      "Tenant configuration for business profile, billing cycles, grace periods, M-Pesa gateway credentials, role-based access control, and security audit logs.",
     whyItExists:
-      "Allows ISP owners and administrators to govern tenant preferences and enforce least-privilege access across Admin, NOC, Finance, Support, and Technician roles.",
+      "Allows ISP administrators to configure billing rules, manage staff permissions across roles, and audit operational activity.",
     howItWorks: [
-      "Organization settings (`/settings`) configure business name, support email/phone, currency, timezone, billing cycle (`ANNIVERSARY` or `CALENDAR_MONTH`), and grace period days.",
-      "Captive Portal settings (`/settings/captive-portal`) configure per-tenant hotspot branding and packages.",
-      "All administrative and security events are recorded in the tenant-scoped audit trail.",
+      "Configure your ISP business name, support contact details, currency, timezone, billing cycle, and grace period in the Settings section.",
+      "Manage account phone numbers and verification settings.",
+      "Enforce role-based permissions across Owner, Admin, NOC Engineer, Finance, Support, Technician, and Auditor roles.",
     ],
     availableActions: [
-      "Update organization & billing configuration (`/settings`)",
-      "Customize Captive Portal (`/settings/captive-portal`)",
-      "Review RBAC permissions and security/audit events",
+      "Update organization and billing settings in the Settings section",
+      "Update and verify account phone numbers",
+      "Configure Captive Portal branding and hotspot packages",
+      "Review role permissions and security audit logs",
     ],
-    requiredPermissions: ["org.manage", "users.manage", "audit.view", "soc.view"],
-    authoritativeDataSources: ["organizations", "profiles", "audit_log", "security_events"],
-    dependencies: ["Supabase Auth & PostgreSQL RLS"],
-    configurationRequirements: ["Requires `isp_owner` or `super_admin` role for tenant-wide settings."],
+    requiredPermissions: [
+      "org.manage",
+      "users.manage",
+      "audit.view",
+      "soc.view",
+    ],
+    authoritativeDataSources: [
+      "organizations",
+      "profiles",
+      "audit_log",
+      "security_events",
+    ],
+    dependencies: ["Multi-tenant authentication and role permissions"],
+    configurationRequirements: [
+      "Requires ISP Owner or Administrator permissions to modify tenant settings.",
+    ],
     keywords: [
       "settings",
       "configuration",
@@ -309,25 +445,30 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
   },
   {
     id: "sms-communications",
-    featureName: "SMS Communications, Bulk Campaigns & E.164 Phone Management",
-    module: "Communications & Notifications",
+    featureName: "SMS Communications and Customer Notifications",
+    module: "Communications and Notifications",
+    navigationSection: "SMS section",
     route: "/sms",
-    apiEndpoints: ["/api/v1/sms", "/api/v1/sms/webhook", "/api/v1/settings/phone"],
+    apiEndpoints: [
+      "/api/v1/sms",
+      "/api/v1/sms/webhook",
+      "/api/v1/settings/phone",
+    ],
     description:
-      "Tenant-isolated SMS communication system for sending individual, targeted, and bulk SMS notifications, managing templates, tracking carrier delivery reports, and normalizing subscriber phone numbers.",
+      "Multi-tenant SMS communication workspace for sending individual, targeted, and bulk SMS notifications, managing templates, and tracking delivery status.",
     whyItExists:
-      "Enables ISPs to send payment receipts, overdue reminders, expiry alerts, outage announcements, and package upgrade campaigns using verified E.164 subscriber phone numbers.",
+      "Enables ISPs to communicate directly with subscribers via SMS for payment confirmations, overdue reminders, expiry alerts, maintenance notices, and service announcements.",
     howItWorks: [
-      "Phone numbers collected at registration or in subscriber profiles are validated and normalized to canonical E.164 format (`+2547XXXXXXXX`).",
-      "Operators compose individual or targeted bulk SMS on `/sms` by filtering subscribers by status, package, overdue balance, or POP/Router.",
-      "Personalization variables (`{{customer_name}}`, `{{package_name}}`, `{{expiry_date}}`, `{{amount_due}}`, `{{paybill_number}}`) are resolved from live customer records before dispatch.",
-      "Bulk SMS requires `sms.send_bulk` permission and explicit confirmation before transmission.",
+      "Customer phone numbers collected during registration or in subscriber profiles are validated and normalized to international format.",
+      "In the SMS section, authorized staff can send individual messages or target groups such as overdue customers, active subscribers, suspended accounts, specific packages, or POP sites.",
+      "Dynamic customer variables such as customer name, package name, expiry date, and amount due are filled automatically from live records.",
+      "Bulk SMS campaigns display a preview and require explicit operator confirmation before sending.",
     ],
     availableActions: [
-      "Send individual, targeted, or bulk SMS (`/sms`)",
-      "Manage approved SMS templates and automated triggers (`/sms` → Templates)",
-      "Configure Africa's Talking or Twilio SMS gateway (`/sms` → Gateway Settings)",
-      "Update and verify account phone number (`/settings` → Account & session)",
+      "Send individual or targeted bulk SMS campaigns in the SMS section",
+      "Create and manage reusable SMS templates",
+      "View SMS delivery history and recipient preferences",
+      "Configure Africa's Talking or Twilio SMS provider settings",
     ],
     requiredPermissions: [
       "sms.view",
@@ -346,9 +487,9 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "sms_templates",
       "sms_provider_configs",
     ],
-    dependencies: ["Africa's Talking / Twilio SMS Gateway", "Customer E.164 Phone Directory"],
+    dependencies: ["SMS gateway provider configuration", "Subscriber phone numbers"],
     configurationRequirements: [
-      "Connect an SMS gateway provider (`AFRICAS_TALKING` or `TWILIO`) in `/sms` → Gateway Settings.",
+      "Connect an SMS gateway provider in the SMS section under Gateway Settings.",
     ],
     keywords: [
       "how do i send sms",
@@ -356,11 +497,14 @@ export const SYSTEM_CAPABILITY_REGISTRY: FeatureCapabilityDefinition[] = [
       "sms template",
       "configure sms provider",
       "change phone number",
+      "sms module",
     ],
   },
 ];
 
-export function findMatchingCapabilities(query: string): FeatureCapabilityDefinition[] {
+export function findMatchingCapabilities(
+  query: string
+): FeatureCapabilityDefinition[] {
   const q = query.trim().toLowerCase();
   if (!q) return SYSTEM_CAPABILITY_REGISTRY;
 
@@ -374,7 +518,8 @@ export function findMatchingCapabilities(query: string): FeatureCapabilityDefini
     if (q.includes(cap.route.toLowerCase())) score += 6;
 
     const tokens = q.split(/\W+/).filter((t) => t.length >= 3);
-    const haystack = `${cap.featureName} ${cap.module} ${cap.description} ${cap.howItWorks.join(" ")} ${cap.availableActions.join(" ")} ${cap.keywords.join(" ")}`.toLowerCase();
+    const haystack =
+      `${cap.featureName} ${cap.module} ${cap.description} ${cap.howItWorks.join(" ")} ${cap.availableActions.join(" ")} ${cap.keywords.join(" ")}`.toLowerCase();
     for (const t of tokens) {
       if (haystack.includes(t)) score += 1;
     }

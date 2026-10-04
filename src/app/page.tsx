@@ -621,12 +621,12 @@ export default function HomePage() {
               <div className="p-4 rounded-xl bg-surface-subtle border border-border">
                 <Server className="w-6 h-6 text-primary mx-auto mb-2" />
                 <div className="font-extrabold text-sm text-foreground">MikroTik Fleet</div>
-                <div className="text-[11px] text-muted-foreground mt-1">API &amp; WireGuard Tunnel</div>
+                <div className="text-[11px] text-muted-foreground mt-1">RouterOS API &amp; WireGuard Tunnel</div>
               </div>
               <div className="p-4 rounded-xl bg-surface-subtle border border-border">
                 <Database className="w-6 h-6 text-primary mx-auto mb-2" />
                 <div className="font-extrabold text-sm text-foreground">FreeRADIUS Engine</div>
-                <div className="text-[11px] text-muted-foreground mt-1">rlm_sql PostgreSQL Auth</div>
+                <div className="text-[11px] text-muted-foreground mt-1">AAA Authentication &amp; Accounting</div>
               </div>
               <div className="p-4 rounded-xl bg-surface-subtle border border-border">
                 <CreditCard className="w-6 h-6 text-primary mx-auto mb-2" />
@@ -639,8 +639,8 @@ export default function HomePage() {
               <div className="text-xs font-extrabold uppercase tracking-wider text-primary">
                 QC NetCore Operating System Core
               </div>
-              <p className="text-xs text-muted-foreground max-w-xl mx-auto">
-                Subscribers • Service Plans • Invoices • Active Sessions • Field Work Orders • Real-time Telemetry
+              <p className="text-xs text-muted-foreground max-w-2xl mx-auto">
+                Subscribers • PPPoE &amp; Hotspot Plans • Invoices &amp; Ledger • Captive Portal • SMS Communications • Field Work Orders • Live NOC Telemetry • AI ISP Copilot
               </p>
             </div>
           </div>
@@ -658,39 +658,57 @@ export default function HomePage() {
             <h2 className="text-2xl sm:text-4xl font-extrabold text-foreground tracking-tight">
               Everything Needed to Run a Broadband ISP
             </h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Every module is built directly into QC NetCore so your network, billing, customer communications, and field teams work from one system.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                title: "Network Operations",
-                desc: "MikroTik router fleet management, WireGuard VPN tunnels, IP pool allocation, active session disconnects, and network alerts.",
+                title: "Network Operations & Monitoring",
+                desc: "MikroTik router fleet management, FreeRADIUS authentication, active PPPoE and Hotspot session monitoring, router health telemetry, WireGuard connectivity, and live outage alerts.",
                 icon: RouterIcon,
               },
               {
-                title: "Billing & Payments",
-                desc: "Automated M-Pesa STK Push callbacks, Paybill C2B reconciliation, invoice generation, and grace period suspensions.",
+                title: "Billing & M-Pesa Payments",
+                desc: "Automated M-Pesa STK Push checkout, Paybill C2B payment reconciliation, recurring invoices, grace-period handling, automatic suspension and reconnection, and financial ledger tracking.",
                 icon: CreditCard,
               },
               {
                 title: "Subscriber Management",
-                desc: "Complete CRM for PPPoE and Hotspot accounts, installation addresses, contact records, and service history.",
+                desc: "Unified customer CRM for PPPoE and Hotspot accounts with verified phone numbers, installation addresses, POP site assignment, service status tracking, and full account history.",
                 icon: Users,
               },
               {
-                title: "Hotspot & Vouchers",
-                desc: "Customizable Captive Portal, instant voucher batch generation, time-based access control, and usage caps.",
+                title: "PPPoE Broadband Management",
+                desc: "Configure residential and business broadband plans with download and upload speed limits, burst thresholds, static or pool IP assignment, and automated router provisioning.",
+                icon: Network,
+              },
+              {
+                title: "Hotspot & Customizable Captive Portal",
+                desc: "Multi-tenant branded captive portal with custom logo, colors, package cards, instant M-Pesa STK Push checkout, prepaid voucher batch generation, and time or data caps.",
                 icon: Wifi,
               },
               {
-                title: "Business Analytics",
-                desc: "Live revenue reporting, active session graphs, subscriber growth rate, churn metrics, and ARPU analytics.",
-                icon: BarChart3,
+                title: "Customer Self-Care Portal",
+                desc: "Dedicated subscriber portal where customers check their active package and expiry date, renew service via M-Pesa, view invoices and receipts, and submit support requests.",
+                icon: Smartphone,
               },
               {
-                title: "Customer Self-Care",
-                desc: "Subscribers can check package expiration, make M-Pesa renewals directly, view invoices, and request support.",
-                icon: Smartphone,
+                title: "Field Operations & Inventory",
+                desc: "Manage technician installation and repair work orders, fiber ONT optical signal checks, SLA support tickets, and network equipment and CPE inventory.",
+                icon: MapPin,
+              },
+              {
+                title: "SMS Customer Communications",
+                desc: "Send individual, filtered, or bulk SMS notifications to subscribers using their registered phone numbers for payment reminders, expiry notices, and outage updates.",
+                icon: Phone,
+              },
+              {
+                title: "Business Analytics & AI ISP Copilot",
+                desc: "Track live revenue, MRR, ARPU, package performance, and churn alongside a built-in AI ISP Copilot that answers operational questions about subscribers, billing, and routers.",
+                icon: Sparkles,
               },
             ].map((card, idx) => {
               const Icon = card.icon;

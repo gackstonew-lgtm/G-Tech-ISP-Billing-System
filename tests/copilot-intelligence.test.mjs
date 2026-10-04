@@ -11,18 +11,19 @@ import {
 } from "../src/lib/ai/copilot-tools.ts";
 import { buildDemoCopilotEnvironment } from "../src/lib/ai/live-data-loader.ts";
 
-test("Subscriber Intelligence: 'Who is our newest subscriber?' invokes getNewestSubscriber and returns enriched context", () => {
+test("Subscriber Intelligence: 'Who is our newest subscriber?' invokes getNewestSubscriber and returns clean plain-text enriched context", () => {
   const res = runCopilotQuery("Who is our newest subscriber?");
   assert.equal(res.intent, "NEWEST_SUBSCRIBER_LOOKUP");
   assert.ok(res.toolsInvoked?.includes("getNewestSubscriber"));
   // In SEED_CUSTOMERS, Ahmed Hassan Omar (2025-02-01) is the most recently registered subscriber
   assert.match(res.answerMarkdown, /Ahmed Hassan Omar/);
   assert.match(res.answerMarkdown, /GT-8925/);
-  assert.match(res.answerMarkdown, /\*\*Package:\*\*/);
-  assert.match(res.answerMarkdown, /\*\*Status:\*\*/);
-  assert.match(res.answerMarkdown, /\*\*POP \/ Site:\*\*/);
-  assert.match(res.answerMarkdown, /\*\*Balance Due:\*\*/);
-  assert.match(res.answerMarkdown, /Data checked:/);
+  assert.match(res.answerMarkdown, /Package:/);
+  assert.match(res.answerMarkdown, /Status:/);
+  assert.match(res.answerMarkdown, /POP:/);
+  assert.match(res.answerMarkdown, /Balance due:/i);
+  // Strict plain text: no Markdown bold, headings, backticks, or raw debug metadata
+  assert.doesNotMatch(res.answerMarkdown, /\*\*|###|`|Sources:|Environment:/);
 
   // Oldest subscriber check
   const oldest = runCopilotQuery("Who is our oldest subscriber?");
@@ -30,11 +31,34 @@ test("Subscriber Intelligence: 'Who is our newest subscriber?' invokes getNewest
   assert.ok(oldest.toolsInvoked?.includes("getOldestSubscriber"));
   assert.match(oldest.answerMarkdown, /John Kamau Mwangi/);
   assert.match(oldest.answerMarkdown, /GT-8921/);
+  assert.doesNotMatch(oldest.answerMarkdown, /\*\*|###|`/);
 
-  // Top 10 newest subscribers check
+  // Top 10 newest subscribers check (clean numbered list, no Markdown pipe tables)
   const top10 = runCopilotQuery("Who are our 10 newest subscribers?");
   assert.equal(top10.intent, "NEWEST_SUBSCRIBER_LOOKUP");
-  assert.match(top10.answerMarkdown, /\| # \| Subscriber \| Package \|/);
+  assert.match(top10.answerMarkdown, /1\. Customer: Ahmed Hassan Omar/);
+  assert.doesNotMatch(top10.answerMarkdown, /\| # \| Subscriber \|/);
+});
+
+test("Concise Simple Questions & AI Feature Discovery", () => {
+  const activeCount = runCopilotQuery("How many active subscribers do we have?");
+  assert.match(
+    activeCount.answerMarkdown,
+    /There are \d+ active subscribers out of \d+ total subscribers\./
+  );
+  assert.doesNotMatch(activeCount.answerMarkdown, /\*\*|###|`/);
+
+  const offlineRouters = runCopilotQuery("Which routers are offline?");
+  assert.match(offlineRouters.answerMarkdown, /No routers are currently offline/i);
+
+  const whatCanDo = runCopilotQuery("What can QC NetCore do?");
+  assert.equal(whatCanDo.intent, "FEATURE_AND_NAVIGATION_GUIDE");
+  assert.match(whatCanDo.answerMarkdown, /Network Operations:/);
+  assert.match(whatCanDo.answerMarkdown, /Billing and Payments:/);
+  assert.match(whatCanDo.answerMarkdown, /Subscriber Management:/);
+  assert.match(whatCanDo.answerMarkdown, /Hotspot and Captive Portal:/);
+  assert.match(whatCanDo.answerMarkdown, /SMS Communications:/);
+  assert.doesNotMatch(whatCanDo.answerMarkdown, /\*\*|###|`|\/api\/v1\//);
 });
 
 test("Conversational Context & Follow-up Pronoun Resolution across multi-turn questions", () => {
@@ -75,7 +99,7 @@ test("Conversational Context & Follow-up Pronoun Resolution across multi-turn qu
     turn5.conversationContext
   );
   assert.equal(turn6.intent, "CONTEXTUAL_FOLLOW_UP");
-  assert.match(turn6.answerMarkdown, /Next Expiry Date:/);
+  assert.match(turn6.answerMarkdown, /Next Expiry Date:/i);
 });
 
 test("Financial, Overdue & Package Intelligence: overdue accounts, highest revenue package, and today's collections", () => {
@@ -84,6 +108,7 @@ test("Financial, Overdue & Package Intelligence: overdue accounts, highest reven
   assert.ok(overdue.toolsInvoked?.includes("getOverdueAccounts"));
   assert.match(overdue.answerMarkdown, /Ahmed Hassan Omar/);
   assert.match(overdue.answerMarkdown, /David Kipchumba Koech/);
+  assert.doesNotMatch(overdue.answerMarkdown, /\*\*|###|`/);
 
   const popularPkg = runCopilotQuery("Which package has the most subscribers?");
   assert.equal(popularPkg.intent, "PACKAGE_ANALYTICS");
@@ -129,16 +154,17 @@ test("Network, Router Sessions, Outages & Business Intelligence", () => {
 test("Software-Awareness Layer: Feature Explanation & Navigation Assistance", () => {
   const pppoeHow = runCopilotQuery("How does PPPoE billing work?");
   assert.equal(pppoeHow.intent, "FEATURE_AND_NAVIGATION_GUIDE");
-  assert.match(pppoeHow.answerMarkdown, /\/plans/);
-  assert.match(pppoeHow.answerMarkdown, /Mikrotik-Rate-Limit/);
+  assert.match(pppoeHow.answerMarkdown, /Service Plans and Billing sections/);
+  assert.match(pppoeHow.answerMarkdown, /PPPoE/);
+  assert.doesNotMatch(pppoeHow.answerMarkdown, /\/api\/v1\//);
 
   const captiveWhere = runCopilotQuery("Where do I configure the captive portal?");
   assert.equal(captiveWhere.intent, "FEATURE_AND_NAVIGATION_GUIDE");
-  assert.match(captiveWhere.answerMarkdown, /\/settings\/captive-portal/);
+  assert.match(captiveWhere.answerMarkdown, /Captive Portal Settings and Vouchers sections/);
 
   const addSubHow = runCopilotQuery("How do I add a subscriber?");
   assert.equal(addSubHow.intent, "FEATURE_AND_NAVIGATION_GUIDE");
-  assert.match(addSubHow.answerMarkdown, /\/customers/);
+  assert.match(addSubHow.answerMarkdown, /Subscribers section/);
 });
 
 test("Multi-Tenant Security, RBAC Enforcement, Secret Redaction & Audit Logging", () => {

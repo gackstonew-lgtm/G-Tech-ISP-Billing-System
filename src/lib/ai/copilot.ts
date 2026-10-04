@@ -1,10 +1,9 @@
 // ============================================================================
 // QC NETCORE — GROUNDED AI ISP OPERATIONS COPILOT ENGINE
 // ============================================================================
-// Architecture:
-//   Question -> Intent & Pronoun Resolution -> Authorized Copilot Toolkit ->
-//   Live Tenant Data (or Isolated Demo Data) -> Cross-Module Correlation ->
-//   Validation & Calculation Explanation -> Grounded Answer + Audit Trail
+// Produces clean, natural, plain-text responses grounded in authoritative
+// tenant data and verified platform capabilities while enforcing RBAC,
+// multi-tenant isolation, and secret redaction.
 // ============================================================================
 
 import {
@@ -16,6 +15,7 @@ import {
   type CopilotExecutionContext,
   type EnrichedSubscriberRecord,
 } from "./copilot-tools.ts";
+import { formatPhoneForDisplay } from "../sms/phone.ts";
 import type { UserRole } from "../../types/index.ts";
 
 export interface CopilotContextSnapshot {
@@ -109,6 +109,36 @@ export interface CopilotResponse {
   conversationContext?: CopilotConversationMemory;
 }
 
+/**
+ * Strips Markdown formatting artifacts (#, ##, ###, *, **, ***, _, __, `, >, pipe tables)
+ * so user-facing Copilot output is always clean, readable plain text.
+ */
+export function sanitizeToPlainText(input: string): string {
+  if (!input) return "";
+  return input
+    .replace(/```[\s\S]*?```/g, (block) =>
+      block.replace(/```[a-zA-Z0-9_-]*\n?/g, "").replace(/```/g, "")
+    )
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*{1,3}([^*\n]+)\*{1,3}/g, "$1")
+    .replace(/\b_{1,2}([^_\n]+)_{1,2}\b/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/^>\s?/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .replace(/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/gm, "")
+    .replace(/\|/g, " ")
+    .replace(/([A-Z0-9])_([A-Z0-9])/g, "$1 $2")
+    .replace(/[#*`_~]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function isTechnicalCodeOrRouteRequest(prompt: string): boolean {
+  return /\b(source code|sql query|api endpoint|api path|route path|database table|schema|cli command)\b/i.test(
+    prompt
+  );
+}
+
 function formatDateTimeEAT(iso?: string | null, timezone = "Africa/Nairobi"): string {
   if (!iso) return "Not recorded";
   const d = new Date(iso);
@@ -120,15 +150,16 @@ function formatDateTimeEAT(iso?: string | null, timezone = "Africa/Nairobi"): st
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: true,
       timeZone: timezone,
     }).format(d);
   } catch {
-    return d.toISOString();
+    return d.toUTCString();
   }
 }
 
 function formatDateOnly(iso?: string | null, timezone = "Africa/Nairobi"): string {
-  if (!iso) return "Not set";
+  if (!iso) return "Not scheduled";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   try {
@@ -139,14 +170,10 @@ function formatDateOnly(iso?: string | null, timezone = "Africa/Nairobi"): strin
       timeZone: timezone,
     }).format(d);
   } catch {
-    return d.toISOString().split("T")[0];
+    return d.toISOString().slice(0, 10);
   }
 }
 
-/**
- * Converts a legacy CopilotContextSnapshot into a CopilotDataset if a test caller
- * passes a custom snapshot directly to `runCopilotQuery(prompt, snapshot)`.
- */
 function adaptSnapshotToEnvironment(snapshot: CopilotContextSnapshot): {
   ctx: CopilotExecutionContext;
   dataset: CopilotDataset;
@@ -154,7 +181,6 @@ function adaptSnapshotToEnvironment(snapshot: CopilotContextSnapshot): {
   const base = buildDemoCopilotEnvironment();
   const orgId = base.ctx.organizationId;
 
-  // Merge custom subscribers from snapshot if provided
   if (snapshot.subscribers && snapshot.subscribers.length > 0) {
     base.dataset.customers = snapshot.subscribers.map((s, idx) => {
       const existing = base.dataset.customers.find(
@@ -234,40 +260,44 @@ function adaptSnapshotToEnvironment(snapshot: CopilotContextSnapshot): {
 }
 
 /**
- * Formats a comprehensive enriched subscriber card in Markdown using only real fields.
+ * Formats a subscriber record into clean plain text without Markdown symbols.
  */
-function formatEnrichedSubscriberMarkdown(
+function formatEnrichedSubscriberPlainText(
   sub: EnrichedSubscriberRecord,
   ctx: CopilotExecutionContext,
-  headingLabel?: string
+  leadSentence?: string
 ): string {
   const lines: string[] = [];
-  if (headingLabel) {
-    lines.push(`### ${headingLabel}`);
+  if (leadSentence) {
+    lines.push(leadSentence);
   }
-  lines.push(`**${sub.fullName}** (\`${sub.accountNumber}\`)`);
-  lines.push(`- **Account Number:** \`${sub.accountNumber}\``);
-  lines.push(`- **Service:** ${sub.serviceType}`);
-  lines.push(`- **Package:** ${sub.packageName} (${sub.speedMbpsLabel})`);
-  lines.push(`- **IP Address:** ${sub.ipAddress ? `\`${sub.ipAddress}\`` : "No active IP assigned"}`);
-  if (sub.macAddress) {
-    lines.push(`- **MAC / CPE Serial:** \`${sub.macAddress}\``);
+  lines.push(`Customer: ${sub.fullName}`);
+  lines.push(`Customer ID: ${sub.accountNumber}`);
+  if (sub.phoneNumber) {
+    lines.push(`Phone: ${formatPhoneForDisplay(sub.phoneNumber)}`);
   }
-  lines.push(`- **Status:** ${sub.status}`);
+  lines.push(`Service: ${sub.serviceType}`);
+  lines.push(`Package: ${sub.packageName} (${sub.speedMbpsLabel})`);
   lines.push(
-    `- **Current Session:** ${sub.sessionStatus}${
-      sub.isOnline && sub.uptime ? ` (Uptime: ${sub.uptime})` : ""
+    `IP address: ${sub.ipAddress ? sub.ipAddress : "No active IP assigned"}`
+  );
+  lines.push(`Status: ${sub.status}`);
+  lines.push(
+    `Session status: ${sub.sessionStatus}${
+      sub.isOnline && sub.uptime ? ` (${sub.uptime})` : ""
     }`
   );
-  lines.push(`- **POP / Site:** ${sub.popSiteName}`);
+  lines.push(`POP: ${sub.popSiteName}`);
   if (sub.routerName) {
-    lines.push(`- **Router:** ${sub.routerName}`);
+    lines.push(`Router: ${sub.routerName}`);
   }
-  lines.push(`- **Registered:** ${formatDateTimeEAT(sub.registeredAt, ctx.timezone)}`);
+  lines.push(
+    `Registration date: ${formatDateTimeEAT(sub.registeredAt, ctx.timezone)}`
+  );
   if (sub.lastPaymentAmount !== null) {
     lines.push(
-      `- **Last Payment:** ${ctx.currency} ${sub.lastPaymentAmount.toLocaleString()}${
-        sub.lastPaymentReference ? ` (\`${sub.lastPaymentReference}\`)` : ""
+      `Last payment: ${ctx.currency} ${sub.lastPaymentAmount.toLocaleString()}${
+        sub.lastPaymentReference ? ` (${sub.lastPaymentReference})` : ""
       }${
         sub.lastPaymentDate
           ? ` on ${formatDateOnly(sub.lastPaymentDate, ctx.timezone)}`
@@ -275,18 +305,20 @@ function formatEnrichedSubscriberMarkdown(
       }`
     );
   } else {
-    lines.push(`- **Last Payment:** No confirmed payment record found`);
+    lines.push("Last payment: No confirmed payment recorded");
   }
-  lines.push(`- **Payment Status:** ${sub.paymentStatus}`);
-  lines.push(`- **Balance Due:** ${ctx.currency} ${sub.balanceDue.toLocaleString()}`);
+  lines.push(`Payment status: ${sub.paymentStatus}`);
+  lines.push(`Balance due: ${ctx.currency} ${sub.balanceDue.toLocaleString()}`);
   lines.push(
-    `- **Expiry:** ${
-      sub.expiresAt ? formatDateOnly(sub.expiresAt, ctx.timezone) : "Not scheduled"
+    `Expiry date: ${
+      sub.expiresAt
+        ? formatDateOnly(sub.expiresAt, ctx.timezone)
+        : "Not scheduled"
     }`
   );
   if (sub.rxPowerDbm !== null) {
     lines.push(
-      `- **ONT Optical Signal:** \`${sub.rxPowerDbm.toFixed(1)} dBm\` (QoE Score: **${sub.qualityScore}/100**)`
+      `Optical signal: ${sub.rxPowerDbm.toFixed(1)} dBm (Quality score: ${sub.qualityScore}/100)`
     );
   }
   return lines.join("\n");
@@ -303,25 +335,25 @@ function buildProposedActionsForSubscriber(
       label:
         sub.balanceDue > 0
           ? `Send M-Pesa STK Renewal Prompt (${currency} ${sub.balanceDue.toLocaleString()})`
-          : `Reset PPPoE Session & Reboot ONT (${sub.accountNumber})`,
+          : `Reset PPPoE Session (${sub.accountNumber})`,
       targetAccount: sub.accountNumber,
       permissionRequired:
         sub.balanceDue > 0 ? "billing.reconcile" : "routers.manage",
       requiresConfirmation: true,
       commandPreview:
         sub.balanceDue > 0
-          ? `POST /api/v1/mpesa-stk-push { accountReference: "${sub.accountNumber}", amount: ${sub.balanceDue} }`
-          : `radclient -x NAS:3799 disconnect User-Name='${sub.pppoeUsername || sub.accountNumber}'`,
+          ? `Send M-Pesa payment prompt for ${currency} ${sub.balanceDue.toLocaleString()} to account ${sub.accountNumber}`
+          : `Reset PPPoE session for subscriber ${sub.accountNumber}`,
     });
   }
   if (sub.rxPowerDbm !== null && sub.rxPowerDbm < -25.0) {
     actions.push({
       actionId: `act-dispatch-${sub.accountNumber}`,
-      label: `Dispatch Fiber Splice Repair Ticket (${sub.rxPowerDbm.toFixed(1)} dBm)`,
+      label: `Create Field Repair Work Order (${sub.rxPowerDbm.toFixed(1)} dBm)`,
       targetAccount: sub.accountNumber,
       permissionRequired: "work_orders.update",
       requiresConfirmation: true,
-      commandPreview: `CREATE WorkOrder { type: "REPAIR", customer: "${sub.fullName}", rxDbm: ${sub.rxPowerDbm} }`,
+      commandPreview: `Assign fiber repair work order for ${sub.fullName} (${sub.accountNumber})`,
     });
   }
   return actions;
@@ -340,9 +372,7 @@ export function executeCopilotIntelligence(params: {
   const memory: CopilotConversationMemory = { ...(params.memory || {}) };
   const toolkit = new CopilotToolkit(ctx, dataset);
   const q = prompt.trim().toLowerCase();
-  const checkedLabel = formatDateTimeEAT(ctx.checkedAtIso, ctx.timezone);
-  const modeLabel =
-    ctx.environmentMode === "LIVE_TENANT_DATA" ? "Live Tenant Data" : "Demo Data";
+  const allowTechnical = isTechnicalCodeOrRouteRequest(prompt);
 
   const finalize = (
     res: Omit<
@@ -363,15 +393,24 @@ export function executeCopilotIntelligence(params: {
       permissionDenials: [...toolkit.permissionDenials],
     });
 
-    const footerNote = `\n\n*Data checked: ${checkedLabel} (${ctx.timezone}) · Environment: ${modeLabel}${
-      sources.length > 0 ? ` · Sources: ${sources.join(", ")}` : ""
-    }*`;
+    const isDataQuery =
+      res.intent !== "FEATURE_AND_NAVIGATION_GUIDE" &&
+      res.intent !== "SECURITY_POLICY_REFUSAL" &&
+      res.intent !== "PERMISSION_DENIED";
+
+    let cleanAnswer = sanitizeToPlainText(res.answerMarkdown);
+    if (
+      ctx.environmentMode === "DEMO_DATA" &&
+      isDataQuery &&
+      !cleanAnswer.includes("demo workspace")
+    ) {
+      cleanAnswer = `${cleanAnswer}\n\nThis information is from the demo workspace.`;
+    }
 
     return {
       ...res,
-      answerMarkdown: res.answerMarkdown.includes("Data checked:")
-        ? res.answerMarkdown
-        : `${res.answerMarkdown}${footerNote}`,
+      headline: sanitizeToPlainText(res.headline),
+      answerMarkdown: cleanAnswer,
       toolsInvoked: [...toolkit.toolsInvoked],
       sourcesCited: sources,
       environmentMode: ctx.environmentMode,
@@ -381,7 +420,7 @@ export function executeCopilotIntelligence(params: {
   };
 
   // ==========================================================================
-  // 0. SECURITY & SECRET PROTECTION RULE (Rule 30)
+  // 0. SECURITY & SECRET PROTECTION RULE
   // ==========================================================================
   if (
     /\b(password|passwords|service_role|service key|api key|secret key|radius secret|webhook secret|private key|session token)\b/i.test(
@@ -391,12 +430,105 @@ export function executeCopilotIntelligence(params: {
   ) {
     return finalize({
       intent: "SECURITY_POLICY_REFUSAL",
-      headline: "Security Policy — Credentials & Secret Protection",
+      headline: "Security Policy",
       answerMarkdown:
-        "For security and compliance reasons, QC NetCore AI Copilot **never exposes passwords, API keys, Supabase service keys, MikroTik RouterOS credentials, FreeRADIUS shared secrets, payment webhook secrets, or private keys**.\n\nAuthorized administrators can rotate credentials directly in `/settings` or `/routers`.",
+        "For security and compliance reasons, QC NetCore never exposes passwords, API keys, service keys, router credentials, FreeRADIUS shared secrets, payment webhook secrets, or private keys.\n\nAuthorized administrators can update credentials in the Settings or Routers sections.",
+      metricsCited: [{ label: "Policy", value: "Credentials Protected" }],
+      proposedActions: [],
+      confidenceLevel: "CONFIRMED",
+    });
+  }
+
+  // ==========================================================================
+  // 0.5 PLATFORM CAPABILITY OVERVIEW ("What can QC NetCore do?")
+  // ==========================================================================
+  if (
+    /\b(what can qc netcore do|what does qc netcore do|what features|all features|capabilities of qc netcore|what can this platform do)\b/i.test(
+      q
+    )
+  ) {
+    toolkit.getFeatureCapabilities();
+    return finalize({
+      intent: "FEATURE_AND_NAVIGATION_GUIDE",
+      headline: "QC NetCore Platform Capabilities",
+      answerMarkdown: [
+        "QC NetCore provides the following operational capabilities for managing an ISP:",
+        "Network Operations: Manage MikroTik routers, monitor CPU and memory health, generate WireGuard and RouterOS provisioning scripts, manage FreeRADIUS authentication and accounting, monitor active PPPoE and Hotspot sessions, and track network alerts.",
+        "Billing and Payments: Create recurring billing plans, issue customer invoices, collect payments via M-Pesa STK Push and Paybill, reconcile unmatched payments, maintain a balanced financial ledger, and automate account suspension and service restoration.",
+        "Subscriber Management: Manage PPPoE and Hotspot customer profiles, account numbers, verified phone numbers, POP site assignments, installation addresses, and Customer 360 history.",
+        "Hotspot and Captive Portal: Customize your branded hotspot login portal, display internet packages, accept M-Pesa checkout, and generate prepaid voucher batches.",
+        "Customer Self-Care: Provide subscribers with a portal to view their active package, check expiry dates, pay via M-Pesa, review invoices, and request support.",
+        "Field Operations: Dispatch technician work orders for installations and repairs, verify optical signal power, track support ticket SLAs, and manage equipment inventory.",
+        "SMS Communications: Send individual or targeted bulk SMS notifications, payment reminders, and outage alerts using personalized customer templates.",
+        "Business Analytics: Track Monthly Recurring Revenue (MRR), ARPU, daily collections, subscriber growth, churn risk, and package performance.",
+      ].join("\n\n"),
+      metricsCited: [{ label: "Core Modules", value: "9 Active Modules" }],
+      proposedActions: [],
+      confidenceLevel: "CONFIRMED",
+    });
+  }
+
+  // ==========================================================================
+  // 0.6 SIMPLE SUBSCRIBER COUNT QUESTIONS (Section 12: Keep Simple Answers Concise)
+  // ==========================================================================
+  if (
+    /^\s*how many\s+(active\s+|suspended\s+|total\s+)?(subscribers|customers)\s+(do we have|are there|are active|are suspended)\??\s*$/i.test(
+      q
+    )
+  ) {
+    const growthRes = toolkit.getCustomerGrowth();
+    if (!growthRes.ok || !growthRes.data) {
+      return finalize({
+        intent:
+          growthRes.errorCode === "PERMISSION_DENIED"
+            ? "PERMISSION_DENIED"
+            : "SUBSCRIBER_LIST_FILTER",
+        headline:
+          growthRes.errorCode === "PERMISSION_DENIED"
+            ? "Permission Required"
+            : "Information Unavailable",
+        answerMarkdown:
+          growthRes.errorCode === "PERMISSION_DENIED"
+            ? "You don't have permission to view subscriber counts."
+            : "I could not retrieve the requested information right now.",
+        metricsCited: [],
+        proposedActions: [],
+      });
+    }
+    const g = growthRes.data;
+    if (/\bactive\b/i.test(q)) {
+      return finalize({
+        intent: "SUBSCRIBER_LIST_FILTER",
+        headline: "Active Subscribers",
+        answerMarkdown: `There are ${g.activeCustomers} active subscribers out of ${g.totalCustomers} total subscribers.`,
+        metricsCited: [
+          { label: "Active Subscribers", value: String(g.activeCustomers) },
+          { label: "Total Subscribers", value: String(g.totalCustomers) },
+        ],
+        proposedActions: [],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+    if (/\bsuspended\b/i.test(q)) {
+      return finalize({
+        intent: "SUBSCRIBER_LIST_FILTER",
+        headline: "Suspended Subscribers",
+        answerMarkdown: `There are ${g.suspendedCustomers} suspended subscribers out of ${g.totalCustomers} total subscribers.`,
+        metricsCited: [
+          { label: "Suspended Subscribers", value: String(g.suspendedCustomers) },
+          { label: "Total Subscribers", value: String(g.totalCustomers) },
+        ],
+        proposedActions: [],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+    return finalize({
+      intent: "SUBSCRIBER_LIST_FILTER",
+      headline: "Subscriber Count",
+      answerMarkdown: `There are ${g.totalCustomers} total subscribers: ${g.activeCustomers} active, ${g.suspendedCustomers} suspended, and ${g.pendingInstallations} pending installation.`,
       metricsCited: [
-        { label: "Policy", value: "Zero Secret Exposure" },
-        { label: "Environment", value: modeLabel },
+        { label: "Total Subscribers", value: String(g.totalCustomers) },
+        { label: "Active", value: String(g.activeCustomers) },
       ],
       proposedActions: [],
       confidenceLevel: "CONFIRMED",
@@ -404,23 +536,30 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 1. NEWEST / OLDEST / TOP-N NEWEST SUBSCRIBERS (Rules 6, 8, 16, 21, 41)
+  // 1. NEWEST / OLDEST / TOP-N NEWEST SUBSCRIBERS
   // ==========================================================================
   if (
-    /\b(newest|most recent|joined most recently|latest subscriber|latest customer|newest customer|newest subscriber|newest subscribers|newest customers)\b/i.test(
+    /\b(newest|most recent|joined most recently|latest subscriber|latest customer|newest customer|newest subscriber|newest subscribers|newest customers|a new subscriber)\b/i.test(
       q
     )
   ) {
-    const countMatch = q.match(/\b(\d+)\s+(?:newest|most recent|latest)\b/) ||
+    const countMatch =
+      q.match(/\b(\d+)\s+(?:newest|most recent|latest)\b/) ||
       q.match(/\b(?:newest|latest)\s+(\d+)\b/);
-    const limit = countMatch ? Math.min(50, Math.max(1, Number(countMatch[1]))) : 1;
+    const limit = countMatch
+      ? Math.min(50, Math.max(1, Number(countMatch[1])))
+      : 1;
 
     const toolRes = toolkit.getNewestSubscriber(limit);
     if (!toolRes.ok) {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: toolRes.message || "You don't have permission to view subscriber records.",
+        answerMarkdown:
+          toolRes.errorCode === "UNAVAILABLE"
+            ? "I could not retrieve the requested information right now."
+            : toolRes.message ||
+              "You don't have permission to view subscriber records.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -431,8 +570,7 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "NEWEST_SUBSCRIBER_LOOKUP",
         headline: "No Subscriber Records Found",
-        answerMarkdown:
-          "I couldn't find any subscriber records in the current QC NetCore tenant database.",
+        answerMarkdown: "No subscriber records were found in the current workspace.",
         metricsCited: [{ label: "Subscribers Found", value: "0" }],
         proposedActions: [],
       });
@@ -447,14 +585,17 @@ export function executeCopilotIntelligence(params: {
     memory.lastRouterId = newest.routerId || undefined;
     memory.lastRouterName = newest.routerName || undefined;
 
-    if (limit === 1 && !/\b(subscribers|customers)\b/.test(q.replace(/newest subscriber$/, ""))) {
+    if (
+      limit === 1 &&
+      !/\b(subscribers|customers)\b/.test(q.replace(/newest subscriber$/, ""))
+    ) {
       return finalize({
         intent: "NEWEST_SUBSCRIBER_LOOKUP",
-        headline: `Newest Subscriber — ${newest.fullName} (${newest.accountNumber})`,
-        answerMarkdown: formatEnrichedSubscriberMarkdown(
+        headline: `Newest Subscriber: ${newest.fullName} (${newest.accountNumber})`,
+        answerMarkdown: formatEnrichedSubscriberPlainText(
           newest,
           ctx,
-          "Newest Subscriber"
+          `The newest subscriber is ${newest.fullName}.`
         ),
         metricsCited: [
           { label: "Subscriber", value: newest.fullName },
@@ -470,19 +611,21 @@ export function executeCopilotIntelligence(params: {
     const rows = list
       .map(
         (s, idx) =>
-          `| ${idx + 1} | **${s.fullName}** (\`${s.accountNumber}\`) | ${s.packageName} | ${
-            s.ipAddress || "—"
-          } | ${s.status} (${s.sessionStatus}) | ${s.popSiteName} | ${formatDateOnly(
+          `${idx + 1}. Customer: ${s.fullName} (${s.accountNumber})\nPackage: ${
+            s.packageName
+          } | IP address: ${s.ipAddress || "Offline"} | Status: ${s.status} (${
+            s.sessionStatus
+          }) | POP: ${s.popSiteName} | Registered: ${formatDateOnly(
             s.registeredAt,
             ctx.timezone
-          )} |`
+          )}`
       )
-      .join("\n");
+      .join("\n\n");
 
     return finalize({
       intent: "NEWEST_SUBSCRIBER_LOOKUP",
-      headline: `${list.length} Newest Subscribers (Ordered by Registration Date)`,
-      answerMarkdown: `| # | Subscriber | Package | IP | Status | POP / Site | Registered |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n${rows}`,
+      headline: `${list.length} Newest Subscribers`,
+      answerMarkdown: `Newest subscribers ordered by registration date:\n\n${rows}`,
       metricsCited: [
         { label: "Returned", value: String(list.length) },
         { label: "Newest", value: newest.fullName },
@@ -499,7 +642,8 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: toolRes.message || "You don't have permission to view subscriber records.",
+        answerMarkdown:
+          toolRes.message || "You don't have permission to view subscriber records.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -509,7 +653,7 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "NEWEST_SUBSCRIBER_LOOKUP",
         headline: "No Subscriber Records Found",
-        answerMarkdown: "I couldn't find any subscriber records in the current QC NetCore records.",
+        answerMarkdown: "No subscriber records were found in the current workspace.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -520,11 +664,11 @@ export function executeCopilotIntelligence(params: {
 
     return finalize({
       intent: "NEWEST_SUBSCRIBER_LOOKUP",
-      headline: `Oldest Subscriber — ${oldest.fullName} (${oldest.accountNumber})`,
-      answerMarkdown: formatEnrichedSubscriberMarkdown(
+      headline: `Oldest Subscriber: ${oldest.fullName} (${oldest.accountNumber})`,
+      answerMarkdown: formatEnrichedSubscriberPlainText(
         oldest,
         ctx,
-        "Oldest Subscriber"
+        `The longest-standing subscriber is ${oldest.fullName}.`
       ),
       metricsCited: [
         { label: "Subscriber", value: oldest.fullName },
@@ -537,7 +681,7 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 2. AMBIGUOUS "WHICH CUSTOMERS ARE NEW?" CLARIFICATION (Rule 25)
+  // 2. AMBIGUOUS "WHICH CUSTOMERS ARE NEW?" CLARIFICATION
   // ==========================================================================
   if (
     /^\s*(which|who are|show)\s+(the\s+)?(customers|subscribers)\s+(are\s+|that are\s+)?new\??\s*$/i.test(
@@ -548,10 +692,17 @@ export function executeCopilotIntelligence(params: {
     const newest = toolkit.getNewestSubscriber(1).data?.[0];
     return finalize({
       intent: "AMBIGUOUS_QUERY_CLARIFICATION",
-      headline: "Clarification Needed — 'New' Subscribers",
-      answerMarkdown: `Do you mean **newly registered subscribers** (by registration date), **newly activated subscriptions**, or **subscribers pending field installation**?\n\nFor immediate reference from current records:\n- **Most Recently Registered Subscriber:** ${
-        newest ? `**${newest.fullName}** (\`${newest.accountNumber}\`, registered ${formatDateOnly(newest.registeredAt, ctx.timezone)})` : "None"
-      }\n- **Pending Field Installation:** **${growth.data?.pendingInstallations ?? 0}** subscriber(s)\n- **Total Active Subscribers:** **${growth.data?.activeCustomers ?? 0}**`,
+      headline: "Clarification Needed: New Subscribers",
+      answerMarkdown: `Do you mean newly registered subscribers by registration date, newly activated subscriptions, or subscribers pending field installation?\n\nCurrent subscriber summary:\nMost recently registered subscriber: ${
+        newest
+          ? `${newest.fullName} (${newest.accountNumber}, registered ${formatDateOnly(
+              newest.registeredAt,
+              ctx.timezone
+            )})`
+          : "None"
+      }\nPending field installation: ${
+        growth.data?.pendingInstallations ?? 0
+      }\nTotal active subscribers: ${growth.data?.activeCustomers ?? 0}`,
       metricsCited: [
         {
           label: "Pending Installation",
@@ -559,14 +710,13 @@ export function executeCopilotIntelligence(params: {
         },
         {
           label: "Most Recent",
-          value: newest ? newest.fullName : "—",
+          value: newest ? newest.fullName : "None",
         },
       ],
       proposedActions: [],
     });
   }
 
-  // ==========================================================================
   // ==========================================================================
   // 2.5 SMS COMMUNICATIONS INTELLIGENCE & CONFIRMATION-GATED CAMPAIGNS
   // ==========================================================================
@@ -576,7 +726,6 @@ export function executeCopilotIntelligence(params: {
     ) &&
     !/\b(how does|how do i|where do i|where can i|explain|configure)\b/i.test(q)
   ) {
-    // A. Confirmation-gated bulk SMS campaign request ("Send a payment reminder to customers with overdue balances")
     if (/\b(send|dispatch|broadcast|notify|trigger)\b/i.test(q)) {
       const recipientMode = /\bsuspended\b/i.test(q)
         ? "SUSPENDED_SUBSCRIBERS"
@@ -597,7 +746,7 @@ export function executeCopilotIntelligence(params: {
           headline: "Permission Required for Bulk SMS",
           answerMarkdown:
             previewRes.message ||
-            "You do not have permission (`sms.send_bulk`) to prepare or send bulk SMS campaigns.",
+            "You do not have permission to prepare or send bulk SMS campaigns.",
           metricsCited: [],
           proposedActions: [],
         });
@@ -607,14 +756,14 @@ export function executeCopilotIntelligence(params: {
       const recipientLines = p.samplePreviews
         .map(
           (r) =>
-            `- **${r.customerName}** (\`${r.accountNumber}\`) · Phone: \`${r.phone}\` · Package: ${r.packageName}`
+            `Customer: ${r.customerName} (${r.accountNumber}) | Phone: ${r.phone} | Package: ${r.packageName}`
         )
         .join("\n");
 
       return finalize({
         intent: "SMS_CAMPAIGN_PROPOSAL",
-        headline: `Confirmation Required — Payment Reminder SMS Campaign (${p.recipientCount} Eligible Recipient(s))`,
-        answerMarkdown: `I have prepared a **Payment Reminder SMS Campaign** targeting **${recipientMode}** in **${ctx.organizationName}**. **No SMS messages have been sent yet** — explicit operator confirmation is required before bulk dispatch.\n\n### Campaign Summary\n- **Target Group:** \`${recipientMode}\`\n- **Eligible Recipients:** **${p.recipientCount}** subscriber(s) with verified E.164 phone numbers\n- **Skipped (Invalid/Opt-Out):** **${p.skippedInvalidCount + p.skippedOptOutCount}**\n- **Encoding & Segments:** \`${p.encoding}\` (**${p.estimatedTotalSegments}** total SMS segments)\n- **Gateway Status:** ${p.providerStatusMessage}\n\n### Sample Eligible Recipients\n${recipientLines || "No eligible recipients matched."}\n\n### Sample Personalized Preview\n> ${p.samplePreviews[0]?.resolvedMessage || "No preview available"}`,
+        headline: `Confirmation Required: Payment Reminder SMS Campaign (${p.recipientCount} Eligible Recipients)`,
+        answerMarkdown: `I have prepared a Payment Reminder SMS campaign for ${ctx.organizationName}. No SMS messages have been sent yet. Explicit operator confirmation is required before sending.\n\nCampaign summary:\nTarget group: Overdue customers\nEligible recipients: ${p.recipientCount} subscribers with valid phone numbers\nSkipped recipients: ${p.skippedInvalidCount + p.skippedOptOutCount}\nEstimated SMS segments: ${p.estimatedTotalSegments}\nGateway status: ${p.providerStatusMessage}\n\nSample recipients:\n${recipientLines || "No eligible recipients matched."}\n\nSample message preview:\n${p.samplePreviews[0]?.resolvedMessage || "No preview available"}`,
         metricsCited: [
           { label: "Eligible Recipients", value: String(p.recipientCount) },
           {
@@ -627,24 +776,24 @@ export function executeCopilotIntelligence(params: {
         proposedActions: [
           {
             actionId: "act-confirm-bulk-sms-overdue",
-            label: `Confirm & Send Payment Reminder SMS to ${p.recipientCount} Customer(s)`,
+            label: `Confirm and Send Payment Reminder SMS to ${p.recipientCount} Customers`,
             permissionRequired: "sms.send_bulk",
             requiresConfirmation: true,
-            commandPreview: `POST /api/v1/sms { action: "send", recipientMode: "${recipientMode}", confirmed: true, recipients: ${p.recipientCount} }`,
+            commandPreview: `Send payment reminder SMS campaign to ${p.recipientCount} overdue customers`,
           },
         ],
         confidenceLevel: "CONFIRMED",
       });
     }
 
-    // B. Informational SMS & Phone Reachability Queries
     const smsRes = toolkit.getSmsMetrics();
     if (!smsRes.ok || !smsRes.data) {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
         answerMarkdown:
-          smsRes.message || "You don't have permission (`sms.view`) to view SMS communications.",
+          smsRes.message ||
+          "You don't have permission to view SMS communication records.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -657,22 +806,24 @@ export function executeCopilotIntelligence(params: {
       overdueWithoutReminder,
     } = smsRes.data;
 
-    // "Which customers have not received their payment reminder?"
-    if (/\b(not received|haven't received|without|missing)\b/i.test(q) && /\b(reminder)\b/i.test(q)) {
-      const listMd =
+    if (
+      /\b(not received|haven't received|without|missing)\b/i.test(q) &&
+      /\b(reminder)\b/i.test(q)
+    ) {
+      const listPlain =
         overdueWithoutReminder.length === 0
           ? "All customers with overdue balances have already received a payment reminder SMS."
           : overdueWithoutReminder
               .map(
                 (r) =>
-                  `- **${r.customerName}** (\`${r.accountNumber}\`) · Phone: \`${r.phone}\` · Balance: **${ctx.currency} ${r.balanceDue.toLocaleString()}** · Package: ${r.packageName}`
+                  `Customer: ${r.customerName} (${r.accountNumber}) | Phone: ${r.phone} | Balance due: ${ctx.currency} ${r.balanceDue.toLocaleString()} | Package: ${r.packageName}`
               )
               .join("\n");
 
       return finalize({
         intent: "SMS_COMMUNICATIONS_QUERY",
         headline: `Overdue Customers Pending Payment Reminder (${overdueWithoutReminder.length})`,
-        answerMarkdown: `Found **${overdueWithoutReminder.length}** customer(s) with overdue balances who have not yet received a payment reminder SMS:\n\n${listMd}`,
+        answerMarkdown: `Found ${overdueWithoutReminder.length} customers with overdue balances who have not yet received a payment reminder SMS:\n\n${listPlain}`,
         metricsCited: [
           {
             label: "Pending Reminder",
@@ -688,10 +839,10 @@ export function executeCopilotIntelligence(params: {
             ? [
                 {
                   actionId: "act-send-missing-reminders",
-                  label: `Prepare Payment Reminder SMS for ${overdueWithoutReminder.length} Overdue Customer(s)`,
+                  label: `Prepare Payment Reminder SMS for ${overdueWithoutReminder.length} Overdue Customers`,
                   permissionRequired: "sms.send_bulk",
                   requiresConfirmation: true,
-                  commandPreview: `POST /api/v1/sms { action: "preview", recipientMode: "OVERDUE_CUSTOMERS" }`,
+                  commandPreview: `Prepare payment reminder SMS for ${overdueWithoutReminder.length} overdue customers`,
                 },
               ]
             : [],
@@ -699,13 +850,12 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // Default SMS & Phone Reachability Summary
     const validCustomersList = recipients
       .filter((r) => r.phoneValid)
       .slice(0, 6)
       .map(
         (r) =>
-          `- **${r.customerName}** (\`${r.accountNumber}\`) — \`${r.formattedPhone}\` (${r.status})`
+          `Customer: ${r.customerName} (${r.accountNumber}) | Phone: ${r.formattedPhone} | Status: ${r.status}`
       )
       .join("\n");
 
@@ -716,13 +866,8 @@ export function executeCopilotIntelligence(params: {
 
     return finalize({
       intent: "SMS_COMMUNICATIONS_QUERY",
-      headline: `SMS Communications & Customer Phone Reachability Summary`,
-      answerMarkdown: `- **Customers with Valid Phone Numbers (SMS Reachable):** **${metrics.customersWithValidPhone}** of **${metrics.totalCustomers}** total subscribers (**${missingOrInvalidCount}** missing/invalid)
-- **Marketing Opt-In Subscribers:** **${metrics.customersReachableMarketing}** (**${optedOutMarketingCount}** opted out of promotional SMS)
-- **SMS Sent Today (24h):** **${metrics.messagesSentToday}** message(s)
-- **SMS Sent This Month (30d):** **${metrics.messagesSentThisMonth}** message(s) (**${paymentReminderSentCount}** payment/suspension reminder(s))
-- **Delivery Breakdown:** **${metrics.deliveredCount}** Delivered · **${metrics.pendingCount}** Sent/Pending · **${metrics.failedCount}** Failed (${metrics.deliveryRatePercent}% delivery rate)
-- **SMS Gateway Status:** **${metrics.providerName}** — ${metrics.statusMessage}\n\n### Verified Subscriber Phone Directory (Sample)\n${validCustomersList}`,
+      headline: "SMS Communications and Customer Phone Reachability",
+      answerMarkdown: `Customers with Valid Phone Numbers: ${metrics.customersWithValidPhone} of ${metrics.totalCustomers} total subscribers (${missingOrInvalidCount} missing or invalid)\nMarketing Opt-In Subscribers: ${metrics.customersReachableMarketing} (${optedOutMarketingCount} opted out of promotional SMS)\nSMS Sent Today: ${metrics.messagesSentToday}\nSMS Sent This Month: ${metrics.messagesSentThisMonth} (${paymentReminderSentCount} payment and suspension reminders)\nDelivery Summary: ${metrics.deliveredCount} delivered, ${metrics.pendingCount} pending, ${metrics.failedCount} failed (${metrics.deliveryRatePercent}% delivery rate)\nSMS Gateway Status: ${metrics.statusMessage}\n\nVerified subscriber phone directory:\n${validCustomersList}`,
       metricsCited: [
         {
           label: "SMS Reachable",
@@ -738,13 +883,12 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 3. EXPLICIT CUSTOMER MATCH OR PRONOUN / FOLLOW-UP RESOLUTION (Rule 46)
+  // 3. EXPLICIT CUSTOMER MATCH OR PRONOUN / FOLLOW-UP RESOLUTION
   // ==========================================================================
   const allTenantCustomers = dataset.customers.filter(
     (c) => c.organizationId === ctx.organizationId
   );
 
-  // Check if query mentions any customer by account number or name token
   const matchedCustomers = allTenantCustomers.filter((c) => {
     if (q.includes(c.accountNumber.toLowerCase())) return true;
     const tokens = c.fullName
@@ -754,11 +898,10 @@ export function executeCopilotIntelligence(params: {
     return tokens.some((t) => q.includes(t));
   });
 
-  // Check if query uses a pronoun / deictic reference to the conversation memory
   const hasPronounReference =
     /\b(that customer|that subscriber|this customer|this subscriber|their|they|he|him|his|she|her)\b/i.test(
       q
-    );
+    ) && !/\b(customers|subscribers|routers|packages)\b/i.test(q);
 
   let targetSubscriber: EnrichedSubscriberRecord | null = null;
   let isFollowUp = false;
@@ -769,32 +912,36 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: res.message || "You don't have permission to view this information.",
+        answerMarkdown:
+          res.message || "You don't have permission to view this information.",
         metricsCited: [],
         proposedActions: [],
       });
     }
     targetSubscriber = res.data?.exact || res.data?.matches[0] || null;
   } else if (matchedCustomers.length > 1) {
-    // Disambiguate multiple matching customers (Rule 47)
-    const searchRes = toolkit.searchCustomers(matchedCustomers[0].fullName.split(" ")[0]);
+    const searchRes = toolkit.searchCustomers(
+      matchedCustomers[0].fullName.split(" ")[0]
+    );
     const matches = searchRes.data ?? [];
-    const listMd = matches
+    const listPlain = matches
       .map(
         (m) =>
-          `- **${m.fullName}** · Account: \`${m.accountNumber}\` · Package: **${m.packageName}** · POP: **${m.popSiteName}**`
+          `Customer: ${m.fullName} | Account: ${m.accountNumber} | Package: ${m.packageName} | POP: ${m.popSiteName}`
       )
       .join("\n");
     return finalize({
       intent: "AMBIGUOUS_QUERY_CLARIFICATION",
       headline: `Multiple Subscribers Found (${matches.length} Matches)`,
-      answerMarkdown: `I found **${matches.length}** subscribers matching that name. Which one do you mean?\n\n${listMd}`,
+      answerMarkdown: `I found ${matches.length} subscribers matching that name. Which one do you mean?\n\n${listPlain}`,
       metricsCited: [{ label: "Matches", value: String(matches.length) }],
       proposedActions: [],
     });
   } else if (
     hasPronounReference &&
-    (memory.lastSubscriberId || memory.lastAccountNumber || memory.lastSubscriberName)
+    (memory.lastSubscriberId ||
+      memory.lastAccountNumber ||
+      memory.lastSubscriberName)
   ) {
     const refKey =
       memory.lastSubscriberId ||
@@ -806,7 +953,8 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: res.message || "You don't have permission to view this information.",
+        answerMarkdown:
+          res.message || "You don't have permission to view this information.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -816,7 +964,6 @@ export function executeCopilotIntelligence(params: {
   }
 
   if (targetSubscriber) {
-    // Update conversation context memory
     memory.lastSubscriberId = targetSubscriber.id;
     memory.lastSubscriberName = targetSubscriber.fullName;
     memory.lastAccountNumber = targetSubscriber.accountNumber;
@@ -825,15 +972,14 @@ export function executeCopilotIntelligence(params: {
     memory.lastRouterId = targetSubscriber.routerId || undefined;
     memory.lastRouterName = targetSubscriber.routerName || undefined;
 
-    // 3a. "Why is [customer] offline?" or diagnostic question
     if (/\b(why|offline|down|problem|issue|not working|disconnected)\b/i.test(q)) {
       const diagRes = toolkit.diagnoseSubscriberOffline(targetSubscriber.id);
       const diag = diagRes.data;
       if (!diag) {
         return finalize({
           intent: "SUBSCRIBER_DIAGNOSTIC",
-          headline: `Diagnostic Unavailable — ${targetSubscriber.fullName}`,
-          answerMarkdown: "Could not retrieve diagnostic telemetry for this subscriber.",
+          headline: `Diagnostic Unavailable: ${targetSubscriber.fullName}`,
+          answerMarkdown: "I could not retrieve the requested information right now.",
           metricsCited: [],
           proposedActions: [],
         });
@@ -843,28 +989,28 @@ export function executeCopilotIntelligence(params: {
         targetSubscriber,
         ctx.currency
       );
-      const evidenceBullets = diag.evidence.map((e) => `- ${e}`).join("\n");
+      const evidenceLines = diag.evidence.join("\n");
 
       return finalize({
         intent: "SUBSCRIBER_DIAGNOSTIC",
-        headline: `Subscriber 360 Diagnostic — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-        answerMarkdown: `**${targetSubscriber.fullName}** (\`${
+        headline: `Subscriber Diagnostic: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+        answerMarkdown: `Customer: ${targetSubscriber.fullName} (${
           targetSubscriber.accountNumber
-        }\`) at **${targetSubscriber.popSiteName}** is currently **${
+        })\nPOP: ${targetSubscriber.popSiteName}\nAccount status: ${
           targetSubscriber.status
-        }** (${
+        } (${
           targetSubscriber.isOnline ? "PPPoE Online" : "Session Offline"
-        }) on **${targetSubscriber.packageName}**.\n\n### ${
-          diag.confidence === "CONFIRMED" ? "Confirmed Cause" : "Likely Cause"
-        }\n${diag.primaryCause}\n\n### Diagnostic Evidence\n${evidenceBullets}\n- **Financial Balance**: ${
+        })\nPackage: ${targetSubscriber.packageName}\n\n${
+          diag.confidence === "CONFIRMED" ? "Confirmed cause" : "Likely cause"
+        }: ${diag.primaryCause}\n\nDiagnostic details:\n${evidenceLines}\nBalance due: ${
           ctx.currency
-        } ${targetSubscriber.balanceDue.toLocaleString()}\n- **ONT Optical Signal**: \`${
+        } ${targetSubscriber.balanceDue.toLocaleString()}\nOptical signal: ${
           targetSubscriber.rxPowerDbm !== null
             ? `${targetSubscriber.rxPowerDbm.toFixed(1)} dBm`
             : "N/A"
-        }\`\n- **Connection Quality Score**: **${
+        }\nConnection quality score: ${
           targetSubscriber.qualityScore
-        }/100**\n- **Churn Risk**: **${targetSubscriber.churnRiskTier}** (${
+        }/100\nChurn risk: ${targetSubscriber.churnRiskTier} (${
           targetSubscriber.churnRiskScore
         }/100)`,
         metricsCited: [
@@ -887,17 +1033,27 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // 3b. Specific follow-up questions about the subscriber (Package, IP, Online, Last Payment, Expiry)
-    if (isFollowUp || /\b(what package|which package|what plan|their ip|his ip|her ip|are they online|is he online|is she online|when did they last pay|how much did he pay|how much did she pay|when does their service expire|when does it expire)\b/i.test(q)) {
+    if (
+      isFollowUp ||
+      /\b(what package|which package|what plan|their ip|his ip|her ip|are they online|is he online|is she online|when did they last pay|how much did he pay|how much did she pay|when does their service expire|when does it expire)\b/i.test(
+        q
+      )
+    ) {
       if (/\b(package|plan|speed)\b/i.test(q)) {
         return finalize({
           intent: "CONTEXTUAL_FOLLOW_UP",
-          headline: `Active Package — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-          answerMarkdown: `**${targetSubscriber.fullName}** (\`${targetSubscriber.accountNumber}\`) is subscribed to **${targetSubscriber.packageName}**.\n- **Service Type:** ${targetSubscriber.serviceType}\n- **Provisioned Speed:** ${targetSubscriber.speedMbpsLabel}\n- **Plan Rate:** ${ctx.currency} ${targetSubscriber.packagePrice.toLocaleString()}\n- **Subscription Status:** ${targetSubscriber.status}\n- **Next Expiry:** ${formatDateOnly(targetSubscriber.expiresAt, ctx.timezone)}`,
+          headline: `Active Package: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+          answerMarkdown: `${targetSubscriber.fullName} (${targetSubscriber.accountNumber}) is subscribed to ${targetSubscriber.packageName}.\nService type: ${targetSubscriber.serviceType}\nSpeed: ${targetSubscriber.speedMbpsLabel}\nMonthly rate: ${ctx.currency} ${targetSubscriber.packagePrice.toLocaleString()}\nStatus: ${targetSubscriber.status}\nExpiry date: ${formatDateOnly(
+            targetSubscriber.expiresAt,
+            ctx.timezone
+          )}`,
           metricsCited: [
             { label: "Subscriber", value: targetSubscriber.fullName },
             { label: "Package", value: targetSubscriber.packageName },
-            { label: "Rate", value: `${ctx.currency} ${targetSubscriber.packagePrice.toLocaleString()}` },
+            {
+              label: "Rate",
+              value: `${ctx.currency} ${targetSubscriber.packagePrice.toLocaleString()}`,
+            },
           ],
           proposedActions: [],
           confidenceLevel: "CONFIRMED",
@@ -908,14 +1064,18 @@ export function executeCopilotIntelligence(params: {
         toolkit.getCustomerSessions(targetSubscriber.id);
         return finalize({
           intent: "CONTEXTUAL_FOLLOW_UP",
-          headline: `Network Addressing — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-          answerMarkdown: `**${targetSubscriber.fullName}** (\`${targetSubscriber.accountNumber}\`):\n- **Assigned IP Address:** ${
-            targetSubscriber.ipAddress ? `\`${targetSubscriber.ipAddress}\`` : "No active IP (session offline)"
-          }\n- **MAC / CPE Serial:** ${
-            targetSubscriber.macAddress ? `\`${targetSubscriber.macAddress}\`` : "Not recorded"
-          }\n- **PPPoE Username:** \`${targetSubscriber.pppoeUsername || "—"}\`\n- **Router:** ${
-            targetSubscriber.routerName || "—"
-          } (${targetSubscriber.popSiteName})\n- **Session State:** ${targetSubscriber.sessionStatus}`,
+          headline: `Network Addressing: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+          answerMarkdown: `Customer: ${targetSubscriber.fullName} (${
+            targetSubscriber.accountNumber
+          })\nIP address: ${
+            targetSubscriber.ipAddress || "No active IP (session offline)"
+          }\nMAC or CPE serial: ${
+            targetSubscriber.macAddress || "Not recorded"
+          }\nPPPoE username: ${targetSubscriber.pppoeUsername || "None"}\nRouter: ${
+            targetSubscriber.routerName || "Not assigned"
+          } (${targetSubscriber.popSiteName})\nSession state: ${
+            targetSubscriber.sessionStatus
+          }`,
           metricsCited: [
             { label: "IP Address", value: targetSubscriber.ipAddress || "Offline" },
             { label: "Session", value: targetSubscriber.sessionStatus },
@@ -930,17 +1090,15 @@ export function executeCopilotIntelligence(params: {
         toolkit.getCustomerSessions(targetSubscriber.id);
         return finalize({
           intent: "CONTEXTUAL_FOLLOW_UP",
-          headline: `Live Session Status — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-          answerMarkdown: `**${targetSubscriber.fullName}** (\`${
+          headline: `Session Status: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+          answerMarkdown: `${targetSubscriber.fullName} (${
             targetSubscriber.accountNumber
-          }\`) is currently **${targetSubscriber.sessionStatus.toUpperCase()}**.\n- **Account Status:** ${
+          }) is currently ${targetSubscriber.sessionStatus.toUpperCase()}.\nAccount status: ${
             targetSubscriber.status
-          }\n- **IP Address:** ${
-            targetSubscriber.ipAddress ? `\`${targetSubscriber.ipAddress}\`` : "None (Offline)"
-          }\n- **Session Uptime:** ${
-            targetSubscriber.uptime || "0s"
-          }\n- **Serving Router:** ${
-            targetSubscriber.routerName || "—"
+          }\nIP address: ${
+            targetSubscriber.ipAddress || "None (Offline)"
+          }\nUptime: ${targetSubscriber.uptime || "0s"}\nRouter: ${
+            targetSubscriber.routerName || "Not assigned"
           } (${targetSubscriber.popSiteName})`,
           metricsCited: [
             { label: "Session", value: targetSubscriber.sessionStatus },
@@ -961,7 +1119,9 @@ export function executeCopilotIntelligence(params: {
           return finalize({
             intent: "PERMISSION_DENIED",
             headline: "Permission Required",
-            answerMarkdown: payRes.message || "You don't have permission to view payment records.",
+            answerMarkdown:
+              payRes.message ||
+              "You don't have permission to view payment records.",
             metricsCited: [],
             proposedActions: [],
           });
@@ -970,29 +1130,38 @@ export function executeCopilotIntelligence(params: {
         const latest = payments[0];
         return finalize({
           intent: "CONTEXTUAL_FOLLOW_UP",
-          headline: `Payment History — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+          headline: `Payment History: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
           answerMarkdown: latest
-            ? `**${targetSubscriber.fullName}** (\`${targetSubscriber.accountNumber}\`) last paid **${
-                ctx.currency
-              } ${latest.amount.toLocaleString()}** on **${formatDateTimeEAT(
+            ? `${targetSubscriber.fullName} (${
+                targetSubscriber.accountNumber
+              }) last paid ${ctx.currency} ${latest.amount.toLocaleString()} on ${formatDateTimeEAT(
                 latest.processedAt || latest.createdAt,
                 ctx.timezone
-              )}**.\n- **Transaction Reference:** \`${latest.transactionReference}\`\n- **Payment Channel:** ${
-                latest.paymentMethod
-              }\n- **Payment Status:** ${targetSubscriber.paymentStatus}\n- **Current Balance Due:** ${
+              )}.\nTransaction reference: ${
+                latest.transactionReference
+              }\nPayment method: ${latest.paymentMethod}\nPayment status: ${
+                targetSubscriber.paymentStatus
+              }\nBalance due: ${
                 ctx.currency
               } ${targetSubscriber.balanceDue.toLocaleString()}`
-            : `No completed payment records were found for **${targetSubscriber.fullName}** (\`${
-                targetSubscriber.accountNumber
-              }\`).\n- **Current Balance Due:** ${
+            : `No completed payment records were found for ${
+                targetSubscriber.fullName
+              } (${targetSubscriber.accountNumber}).\nBalance due: ${
                 ctx.currency
-              } ${targetSubscriber.balanceDue.toLocaleString()} (${targetSubscriber.paymentStatus})`,
+              } ${targetSubscriber.balanceDue.toLocaleString()} (${
+                targetSubscriber.paymentStatus
+              })`,
           metricsCited: [
             {
               label: "Last Payment",
-              value: latest ? `${ctx.currency} ${latest.amount.toLocaleString()}` : "None",
+              value: latest
+                ? `${ctx.currency} ${latest.amount.toLocaleString()}`
+                : "None",
             },
-            { label: "Reference", value: latest ? latest.transactionReference : "—" },
+            {
+              label: "Reference",
+              value: latest ? latest.transactionReference : "—",
+            },
             {
               label: "Balance Due",
               value: `${ctx.currency} ${targetSubscriber.balanceDue.toLocaleString()}`,
@@ -1006,13 +1175,15 @@ export function executeCopilotIntelligence(params: {
       if (/\b(expire|expiry|expiration|renew)\b/i.test(q)) {
         return finalize({
           intent: "CONTEXTUAL_FOLLOW_UP",
-          headline: `Subscription Expiry — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-          answerMarkdown: `**${targetSubscriber.fullName}** (\`${targetSubscriber.accountNumber}\`) service expiry details:\n- **Next Expiry Date:** **${formatDateTimeEAT(
+          headline: `Subscription Expiry: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+          answerMarkdown: `Customer: ${targetSubscriber.fullName} (${
+            targetSubscriber.accountNumber
+          })\nNext Expiry Date: ${formatDateTimeEAT(
             targetSubscriber.expiresAt,
             ctx.timezone
-          )}**\n- **Package:** ${targetSubscriber.packageName}\n- **Subscription Status:** ${
+          )}\nPackage: ${targetSubscriber.packageName}\nStatus: ${
             targetSubscriber.status
-          }\n- **Balance Due:** ${ctx.currency} ${targetSubscriber.balanceDue.toLocaleString()}`,
+          }\nBalance due: ${ctx.currency} ${targetSubscriber.balanceDue.toLocaleString()}`,
           metricsCited: [
             {
               label: "Expiry Date",
@@ -1026,7 +1197,6 @@ export function executeCopilotIntelligence(params: {
       }
     }
 
-    // 3c. Full Customer 360 Dossier (Rule 10)
     const c360Res = toolkit.getCustomer360(targetSubscriber.id);
     const c360 = c360Res.data;
     const actions = buildProposedActionsForSubscriber(
@@ -1035,20 +1205,20 @@ export function executeCopilotIntelligence(params: {
     );
 
     return finalize({
-      intent:
-        /\b(everything|360|tell me about|profile|details)\b/i.test(q)
-          ? "CUSTOMER_360_DOSSIER"
-          : "SUBSCRIBER_DIAGNOSTIC",
-      headline: `Subscriber 360 Dossier — ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
-      answerMarkdown: `${formatEnrichedSubscriberMarkdown(
+      intent: /\b(everything|360|tell me about|profile|details)\b/i.test(q)
+        ? "CUSTOMER_360_DOSSIER"
+        : "SUBSCRIBER_DIAGNOSTIC",
+      headline: `Customer 360 Summary: ${targetSubscriber.fullName} (${targetSubscriber.accountNumber})`,
+      answerMarkdown: `${formatEnrichedSubscriberPlainText(
         targetSubscriber,
-        ctx,
-        "Customer 360 Summary"
-      )}\n- **Open Support Tickets:** ${
-        c360 ? c360.tickets.filter((t) => t.status !== "RESOLVED").length : targetSubscriber.openTicketsCount
-      }\n- **Connection Quality Score:** **${targetSubscriber.qualityScore}/100**\n- **Churn Risk:** **${
+        ctx
+      )}\nOpen support tickets: ${
+        c360
+          ? c360.tickets.filter((t) => t.status !== "RESOLVED").length
+          : targetSubscriber.openTicketsCount
+      }\nConnection quality score: ${targetSubscriber.qualityScore}/100\nChurn risk: ${
         targetSubscriber.churnRiskTier
-      }** (${targetSubscriber.churnRiskScore}/100)`,
+      } (${targetSubscriber.churnRiskScore}/100)`,
       metricsCited: [
         { label: "Status", value: targetSubscriber.status },
         {
@@ -1083,7 +1253,9 @@ export function executeCopilotIntelligence(params: {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: churnRes.message || "You don't have permission to view subscriber metrics.",
+        answerMarkdown:
+          churnRes.message ||
+          "You don't have permission to view subscriber metrics.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -1091,24 +1263,24 @@ export function executeCopilotIntelligence(params: {
     const atRisk = churnRes.data?.atRiskSubscribers ?? [];
     const listText =
       atRisk.length === 0
-        ? "All active subscribers currently have healthy optical power (-15 to -24.5 dBm) and low churn risk."
+        ? "All active subscribers currently have normal optical power (-15 to -24.5 dBm) and low churn risk."
         : atRisk
             .map(
               (s) =>
-                `- **${s.fullName}** (\`${s.accountNumber}\`): Churn Risk **${
+                `Customer: ${s.fullName} (${s.accountNumber}) | Churn risk: ${
                   s.churnRiskTier
-                } (${s.churnRiskScore}/100)** · QoE **${
+                } (${s.churnRiskScore}/100) | Quality score: ${
                   s.qualityScore
-                }/100** · Optical \`${
+                }/100 | Optical signal: ${
                   s.rxPowerDbm !== null ? `${s.rxPowerDbm.toFixed(1)} dBm` : "N/A"
-                }\` · Balance **${ctx.currency} ${s.balanceDue.toLocaleString()}**`
+                } | Balance due: ${ctx.currency} ${s.balanceDue.toLocaleString()}`
             )
             .join("\n");
 
     return finalize({
       intent: "CHURN_AND_OPTICAL_AUDIT",
-      headline: `Proactive Retention & Optical Health Audit (${atRisk.length} Flagged)`,
-      answerMarkdown: `Identified **${atRisk.length}** subscriber(s) requiring retention or fiber link intervention:\n${listText}`,
+      headline: `Retention and Optical Health Audit (${atRisk.length} Flagged)`,
+      answerMarkdown: `Identified ${atRisk.length} subscribers requiring retention or fiber link attention:\n\n${listText}`,
       metricsCited: [
         { label: "At-Risk Subscribers", value: String(atRisk.length) },
         {
@@ -1121,10 +1293,10 @@ export function executeCopilotIntelligence(params: {
           ? [
               {
                 actionId: "act-retention-campaign",
-                label: `Send WhatsApp Renewal & Link Check Notice to ${atRisk.length} Subscriber(s)`,
-                permissionRequired: "customers.update",
+                label: `Send SMS Renewal and Link Check Notice to ${atRisk.length} Subscribers`,
+                permissionRequired: "sms.send_bulk",
                 requiresConfirmation: true,
-                commandPreview: `DISPATCH WhatsApp Template EXPIRY_REMINDER_48H to ${atRisk.length} recipients`,
+                commandPreview: `Send renewal and link check SMS notice to ${atRisk.length} flagged subscribers`,
               },
             ]
           : [],
@@ -1133,7 +1305,7 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 5. OVERDUE ACCOUNTS & "WHO OWES THE MOST?" (Rules 16, 18, 21, 41)
+  // 5. OVERDUE ACCOUNTS & "WHO OWES THE MOST?"
   // ==========================================================================
   if (
     /\b(overdue|owe|owes|arrears|unpaid|not paid|largest overdue|delinquent)\b/i.test(
@@ -1147,7 +1319,8 @@ export function executeCopilotIntelligence(params: {
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
         answerMarkdown:
-          overdueRes.message || "You don't have permission to view billing records.",
+          overdueRes.message ||
+          "You don't have permission to view billing records.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -1158,7 +1331,7 @@ export function executeCopilotIntelligence(params: {
         intent: "OVERDUE_ACCOUNTS_RANKING",
         headline: "Zero Overdue Subscriber Accounts",
         answerMarkdown:
-          "All subscriber accounts currently have a zero overdue balance (`KES 0`).",
+          "All subscriber accounts currently have a zero overdue balance (KES 0).",
         metricsCited: [{ label: "Overdue Accounts", value: "0" }],
         proposedActions: [],
         confidenceLevel: "CONFIRMED",
@@ -1171,19 +1344,25 @@ export function executeCopilotIntelligence(params: {
     memory.lastAccountNumber = topDebtor.accountNumber;
 
     const totalOverdue = list.reduce((sum, s) => sum + s.balanceDue, 0);
-    const tableRows = list
+    const plainRows = list
       .map(
-        (s) =>
-          `| **${s.fullName}** (\`${s.accountNumber}\`) | **${ctx.currency} ${s.balanceDue.toLocaleString()}** | ${s.packageName} | ${s.daysOverdue} days | ${s.serviceType} (${s.status}) |`
+        (s, idx) =>
+          `${idx + 1}. Customer: ${s.fullName} (${s.accountNumber}) | Balance due: ${
+            ctx.currency
+          } ${s.balanceDue.toLocaleString()} | Package: ${
+            s.packageName
+          } | Days overdue: ${s.daysOverdue} days | Status: ${s.status}`
       )
       .join("\n");
 
     return finalize({
       intent: "OVERDUE_ACCOUNTS_RANKING",
-      headline: `Overdue Accounts Ranked by Balance (${list.length} Account(s))`,
-      answerMarkdown: `Highest outstanding balance: **${topDebtor.fullName}** (\`${
+      headline: `Overdue Accounts (${list.length})`,
+      answerMarkdown: `Highest outstanding balance: ${topDebtor.fullName} (${
         topDebtor.accountNumber
-      }\`) owing **${ctx.currency} ${topDebtor.balanceDue.toLocaleString()}**.\n\n| Customer | Balance | Package | Days Overdue | Service |\n| :--- | ---: | :--- | ---: | :--- |\n${tableRows}`,
+      }) owing ${ctx.currency} ${topDebtor.balanceDue.toLocaleString()}.\nTotal overdue receivables: ${
+        ctx.currency
+      } ${totalOverdue.toLocaleString()}\n\nOverdue accounts:\n${plainRows}`,
       metricsCited: [
         { label: "Highest Arrears", value: `${topDebtor.fullName}` },
         {
@@ -1202,22 +1381,22 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 6. ONLINE / OFFLINE / SUSPENDED / EXPIRED SUBSCRIBERS (Rules 14, 21, 23, 41)
+  // 6. ONLINE / OFFLINE / ACTIVE / SUSPENDED / EXPIRED SUBSCRIBERS
   // ==========================================================================
   if (
-    /\b(online|connected right now|active sessions|currently offline|customers offline|who is offline|suspended subscribers|suspended customers|expired subscribers)\b/i.test(
+    /\b(online|connected right now|active sessions|currently offline|customers offline|who is offline|active subscribers|active customers|suspended subscribers|suspended customers|expired subscribers)\b/i.test(
       q
     ) &&
     !/\b(where can i|how do i|router)\b/i.test(q)
   ) {
-    // Online + overdue cross-module check
     if (/\b(overdue|balance|unpaid)\b/i.test(q)) {
       const res = toolkit.searchSubscribers({ isOnline: true, overdueOnly: true });
       if (!res.ok) {
         return finalize({
           intent: "PERMISSION_DENIED",
           headline: "Permission Required",
-          answerMarkdown: res.message || "You don't have permission to view this information.",
+          answerMarkdown:
+            res.message || "You don't have permission to view this information.",
           metricsCited: [],
           proposedActions: [],
         });
@@ -1228,11 +1407,11 @@ export function executeCopilotIntelligence(params: {
         headline: `Online Subscribers with Overdue Balances (${matches.length})`,
         answerMarkdown:
           matches.length === 0
-            ? "There are currently **0** online subscribers with overdue balances. Automated billing enforcement has suspended overdue accounts."
+            ? "There are currently 0 online subscribers with overdue balances. Automated billing enforcement has suspended overdue accounts."
             : matches
                 .map(
                   (s) =>
-                    `- **${s.fullName}** (\`${s.accountNumber}\`) · IP: \`${s.ipAddress}\` · Balance: **${ctx.currency} ${s.balanceDue.toLocaleString()}**`
+                    `Customer: ${s.fullName} (${s.accountNumber}) | IP address: ${s.ipAddress} | Balance due: ${ctx.currency} ${s.balanceDue.toLocaleString()}`
                 )
                 .join("\n"),
         metricsCited: [{ label: "Online + Overdue", value: String(matches.length) }],
@@ -1241,14 +1420,52 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // Offline subscribers table
+    if (/\b(active subscribers|active customers)\b/i.test(q)) {
+      const res = toolkit.getActiveSubscribers();
+      if (!res.ok) {
+        return finalize({
+          intent: "PERMISSION_DENIED",
+          headline: "Permission Required",
+          answerMarkdown:
+            res.message || "You don't have permission to view subscriber records.",
+          metricsCited: [],
+          proposedActions: [],
+        });
+      }
+      const activeList = res.data ?? [];
+      return finalize({
+        intent: "SUBSCRIBER_LIST_FILTER",
+        headline: `Active Subscribers (${activeList.length})`,
+        answerMarkdown:
+          activeList.length === 0
+            ? "There are currently no active subscribers."
+            : activeList
+                .map(
+                  (s) =>
+                    `Customer: ${s.fullName} (${s.accountNumber}) | Package: ${
+                      s.packageName
+                    } | IP address: ${s.ipAddress || "Offline"} | POP: ${
+                      s.popSiteName
+                    }`
+                )
+                .join("\n"),
+        metricsCited: [
+          { label: "Active Subscribers", value: String(activeList.length) },
+        ],
+        proposedActions: [],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+
     if (/\b(offline|disconnected)\b/i.test(q)) {
       const res = toolkit.searchSubscribers({ isOnline: false });
       if (!res.ok) {
         return finalize({
           intent: "PERMISSION_DENIED",
           headline: "Permission Required",
-          answerMarkdown: res.message || "You don't have permission to view subscriber sessions.",
+          answerMarkdown:
+            res.message ||
+            "You don't have permission to view subscriber sessions.",
           metricsCited: [],
           proposedActions: [],
         });
@@ -1257,33 +1474,37 @@ export function executeCopilotIntelligence(params: {
       const rows = offlineList
         .map((s) => {
           const diag = toolkit.diagnoseSubscriberOffline(s.id).data;
-          return `| **${s.fullName}** (\`${s.accountNumber}\`) | ${s.packageName} | ${
-            s.ipAddress || "None"
-          } | ${s.status} | ${diag?.primaryCause || "No active session"} |`;
+          return `Customer: ${s.fullName} (${s.accountNumber}) | Package: ${
+            s.packageName
+          } | Status: ${s.status} | Reason: ${
+            diag?.primaryCause || "No active session"
+          }`;
         })
         .join("\n");
 
       return finalize({
         intent: "SUBSCRIBER_LIST_FILTER",
-        headline: `Offline Subscribers (${offlineList.length} Account(s))`,
+        headline: `Offline Subscribers (${offlineList.length})`,
         answerMarkdown:
           offlineList.length === 0
             ? "All registered subscribers currently have active online sessions."
-            : `| Customer | Package | IP | Status | Reason |\n| :--- | :--- | :--- | :--- | :--- |\n${rows}`,
-        metricsCited: [{ label: "Offline Subscribers", value: String(offlineList.length) }],
+            : rows,
+        metricsCited: [
+          { label: "Offline Subscribers", value: String(offlineList.length) },
+        ],
         proposedActions: [],
         confidenceLevel: "CONFIRMED",
       });
     }
 
-    // Suspended subscribers
     if (/\b(suspended)\b/i.test(q)) {
       const res = toolkit.getSuspendedSubscribers();
       if (!res.ok) {
         return finalize({
           intent: "PERMISSION_DENIED",
           headline: "Permission Required",
-          answerMarkdown: res.message || "You don't have permission to view this information.",
+          answerMarkdown:
+            res.message || "You don't have permission to view this information.",
           metricsCited: [],
           proposedActions: [],
         });
@@ -1298,7 +1519,7 @@ export function executeCopilotIntelligence(params: {
             : list
                 .map(
                   (s) =>
-                    `- **${s.fullName}** (\`${s.accountNumber}\`) · Package: **${s.packageName}** · Balance Due: **${ctx.currency} ${s.balanceDue.toLocaleString()}** · POP: ${s.popSiteName}`
+                    `Customer: ${s.fullName} (${s.accountNumber}) | Package: ${s.packageName} | Balance due: ${ctx.currency} ${s.balanceDue.toLocaleString()} | POP: ${s.popSiteName}`
                 )
                 .join("\n"),
         metricsCited: [{ label: "Suspended Count", value: String(list.length) }],
@@ -1307,14 +1528,14 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // Currently Online Subscribers (PPPoE + Hotspot)
     const pppoeRes = toolkit.getActivePPPoESessions();
     const hsRes = toolkit.getActiveHotspotSessions();
     if (!pppoeRes.ok) {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: pppoeRes.message || "You don't have permission to view active sessions.",
+        answerMarkdown:
+          pppoeRes.message || "You don't have permission to view active sessions.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -1326,16 +1547,18 @@ export function executeCopilotIntelligence(params: {
     const rows = onlinePppoe
       .map(
         (s) =>
-          `| **${s.fullName}** (\`${s.accountNumber}\`) | ${s.packageName} | \`${
-            s.ipAddress || "—"
-          }\` | ${s.routerName || "—"} | ${s.popSiteName} | ${s.uptime || "Active"} |`
+          `Customer: ${s.fullName} (${s.accountNumber}) | Package: ${
+            s.packageName
+          } | IP address: ${s.ipAddress || "Assigned"} | Router: ${
+            s.routerName || "—"
+          } | POP: ${s.popSiteName} | Uptime: ${s.uptime || "Active"}`
       )
       .join("\n");
 
     return finalize({
       intent: "SUBSCRIBER_LIST_FILTER",
-      headline: `${totalOnline} Active Online Sessions (${onlinePppoe.length} PPPoE, ${onlineHotspot.length} Hotspot Voucher)`,
-      answerMarkdown: `**${totalOnline} active session(s)** currently online:\n- **PPPoE Subscribers Online:** **${onlinePppoe.length}**\n- **Active Hotspot Voucher Sessions:** **${onlineHotspot.length}**\n\n| Customer | Package | IP Address | Router | POP / Site | Uptime |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n${rows}`,
+      headline: `${totalOnline} Active Online Sessions`,
+      answerMarkdown: `Active sessions online: ${totalOnline}\nPPPoE subscribers online: ${onlinePppoe.length}\nHotspot voucher sessions online: ${onlineHotspot.length}\n\nConnected PPPoE subscribers:\n${rows}`,
       metricsCited: [
         { label: "Total Online", value: String(totalOnline) },
         { label: "PPPoE Online", value: String(onlinePppoe.length) },
@@ -1347,10 +1570,17 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 7. PACKAGE POPULARITY & PACKAGE REVENUE (Rules 6, 7, 22, 41)
+  // 7. PACKAGE POPULARITY & PACKAGE REVENUE
   // ==========================================================================
-  if (/\b(package|packages|plan|plans)\b/i.test(q) && !/\b(how do i|where do i|create)\b/i.test(q)) {
-    if (/\b(revenue|money|earning|highest revenue|most money|generate|generated)\b/i.test(q)) {
+  if (
+    /\b(package|packages|plan|plans)\b/i.test(q) &&
+    !/\b(how do i|where do i|create|can i)\b/i.test(q)
+  ) {
+    if (
+      /\b(revenue|money|earning|highest revenue|most money|generate|generated)\b/i.test(
+        q
+      )
+    ) {
       const revRes = toolkit.getPackageRevenue();
       if (!revRes.ok) {
         return finalize({
@@ -1367,18 +1597,24 @@ export function executeCopilotIntelligence(params: {
       const rows = list
         .map(
           (p, idx) =>
-            `| ${idx + 1} | **${p.planName}** (${p.serviceType}) | ${p.currency} ${p.price.toLocaleString()} | ${
-              p.subscriberCount
-            } | **${p.currency} ${p.confirmedPaymentsCollected.toLocaleString()}** | ${
+            `${idx + 1}. Package: ${p.planName} (${p.serviceType}) | Price: ${
               p.currency
-            } ${p.contractedMrr.toLocaleString()} |`
+            } ${p.price.toLocaleString()} | Subscribers: ${
+              p.subscriberCount
+            } | Confirmed collections: ${
+              p.currency
+            } ${p.confirmedPaymentsCollected.toLocaleString()} | Monthly recurring revenue: ${
+              p.currency
+            } ${p.contractedMrr.toLocaleString()}`
         )
         .join("\n");
 
       return finalize({
         intent: "PACKAGE_ANALYTICS",
-        headline: `Package Revenue Intelligence — Top Earner: ${top?.planName || "N/A"}`,
-        answerMarkdown: `Ranked by confirmed payments and contracted Monthly Recurring Revenue (MRR):\n\n| # | Package | Price | Subscribers | Confirmed Collections | Contracted MRR |\n| :--- | :--- | ---: | ---: | ---: | ---: |\n${rows}`,
+        headline: `Package Revenue Summary (Top Package: ${top?.planName || "N/A"})`,
+        answerMarkdown: `Highest revenue package: ${top?.planName || "N/A"} with ${
+          top?.currency || ctx.currency
+        } ${(top?.confirmedPaymentsCollected ?? 0).toLocaleString()} in confirmed collections.\n\nPackage revenue breakdown:\n${rows}`,
         metricsCited: top
           ? [
               { label: "Top Package", value: top.planName },
@@ -1397,32 +1633,34 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // Most popular packages by subscriber count
     const pkgRes = toolkit.searchPackages();
     if (!pkgRes.ok) {
       return finalize({
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
-        answerMarkdown: pkgRes.message || "You don't have permission to view packages.",
+        answerMarkdown:
+          pkgRes.message || "You don't have permission to view packages.",
         metricsCited: [],
         proposedActions: [],
       });
     }
     const list = pkgRes.data ?? [];
     const top = list[0];
-    const rankedMd = list
+    const rankedPlain = list
       .map(
         (p, idx) =>
-          `${idx + 1}. **${p.name}** (${p.serviceType}) — **${p.totalSubscribers} subscribers** · ${p.currency} ${p.price.toLocaleString()}`
+          `${idx + 1}. ${p.name} (${p.serviceType}): ${
+            p.totalSubscribers
+          } subscribers, ${p.currency} ${p.price.toLocaleString()}`
       )
       .join("\n");
 
     return finalize({
       intent: "PACKAGE_ANALYTICS",
-      headline: `Most Popular Service Packages (Ranked by Subscriber Count)`,
-      answerMarkdown: `Most popular package: **${top?.name || "N/A"}** with **${
+      headline: "Service Packages Ranked by Subscribers",
+      answerMarkdown: `Most popular package: ${top?.name || "N/A"} with ${
         top?.totalSubscribers ?? 0
-      } subscribers**.\n\n${rankedMd}`,
+      } subscribers.\n\n${rankedPlain}`,
       metricsCited: top
         ? [
             { label: "Most Popular", value: top.name },
@@ -1436,13 +1674,13 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 8. TODAY'S COLLECTIONS, REVENUE, MRR, ARPU & LEDGER (Rules 18, 24, 35, 41)
+  // 8. TODAY'S COLLECTIONS, REVENUE, MRR, ARPU & LEDGER
   // ==========================================================================
   if (
     /\b(collect|collected|today's revenue|revenue today|payments came in|who paid|revenue|ledger|mrr|arpu|balance|payment|reconcil)\b/i.test(
       q
     ) &&
-    !/\b(how does|where can i|where do i)\b/i.test(q)
+    !/\b(how does|where can i|where do i|can i)\b/i.test(q)
   ) {
     const revRes = toolkit.getRevenueMetrics();
     if (!revRes.ok || !revRes.data) {
@@ -1450,7 +1688,8 @@ export function executeCopilotIntelligence(params: {
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
         answerMarkdown:
-          revRes.message || "You don't have permission to view financial and billing records.",
+          revRes.message ||
+          "You don't have permission to view financial and billing records.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -1458,30 +1697,36 @@ export function executeCopilotIntelligence(params: {
     const f = revRes.data;
 
     if (
-      /\b(today|collected today|collect today|came in today|paid recently)\b/i.test(q) &&
+      /\b(today|collected today|collect today|came in today|paid recently)\b/i.test(
+        q
+      ) &&
       !/\b(mrr|arpu|trial balance|ledger)\b/i.test(q)
     ) {
       const latestPays = toolkit.getLatestPayments(5).data ?? [];
       const methodLines = Object.entries(f.todayByMethod)
-        .map(([m, amt]) => `- **${m}:** ${f.currency} ${amt.toLocaleString()}`)
+        .map(([m, amt]) => `${m}: ${f.currency} ${amt.toLocaleString()}`)
         .join("\n");
       const recentTxLines = latestPays
         .map(
           (p) =>
-            `- \`${p.transactionReference}\` · **${p.customerName || p.senderName || "Hotspot"}** · **${
-              p.currency
-            } ${p.amount.toLocaleString()}** (${p.paymentMethod}, ${p.status})`
+            `Reference: ${p.transactionReference} | Customer: ${
+              p.customerName || p.senderName || "Hotspot"
+            } | Amount: ${p.currency} ${p.amount.toLocaleString()} (${
+              p.paymentMethod
+            }, ${p.status})`
         )
         .join("\n");
 
       return finalize({
         intent: "TODAYS_COLLECTIONS_SUMMARY",
         headline: `Today's Confirmed Collections: ${f.currency} ${f.collectedToday.toLocaleString()}`,
-        answerMarkdown: `**Today's collections (last 24h): ${f.currency} ${f.collectedToday.toLocaleString()}**\n${
-          methodLines || `- **M-Pesa:** ${f.currency} ${f.collectedToday.toLocaleString()}`
-        }\n- **Confirmed Transactions (24h):** ${f.todayTransactionsCount}\n- **Failed Payments:** ${
+        answerMarkdown: `Today's collections (last 24 hours): ${f.currency} ${f.collectedToday.toLocaleString()}\n${
+          methodLines || `M-Pesa: ${f.currency} ${f.collectedToday.toLocaleString()}`
+        }\nConfirmed transactions today: ${f.todayTransactionsCount}\nFailed payments: ${
           f.failedPaymentsCount
-        }\n\n### Recent Confirmed Transactions\n${recentTxLines || "No transactions recorded."}`,
+        }\n\nRecent confirmed transactions:\n${
+          recentTxLines || "No transactions recorded."
+        }`,
         metricsCited: [
           {
             label: "Collected (24h)",
@@ -1501,16 +1746,12 @@ export function executeCopilotIntelligence(params: {
 
     return finalize({
       intent: "REVENUE_AND_LEDGER_SUMMARY",
-      headline: "Double-Entry Financial Ledger & Revenue Intelligence Summary",
-      answerMarkdown: `- **Monthly Recurring Revenue (MRR)**: **${f.currency} ${f.mrr.toLocaleString()}** (ARR: **${f.currency} ${f.arr.toLocaleString()}**, ARPU: **${f.currency} ${f.arpu.toLocaleString()}** — *calculated as monthly recurring subscription revenue ÷ active subscribers*)
-- **Collections & Efficiency**: **${f.currency} ${f.collectedThisPeriod.toLocaleString()}** collected (${f.collectionRatePercent}% collection rate)
-- **Accounts Receivable Outstanding**: **${f.currency} ${f.totalArOutstanding.toLocaleString()}**
-- **Double-Entry Trial Balance**: **${
-        f.trialBalanceBalanced ? "BALANCED (0.00 discrepancy)" : "DISCREPANCY DETECTED"
-      }**
-- **Governance Queue**: **${f.unmatchedPaymentsCount}** unmatched payment(s) · **${
+      headline: "Financial Ledger and Revenue Summary",
+      answerMarkdown: `Monthly Recurring Revenue (MRR): ${f.currency} ${f.mrr.toLocaleString()}\nAnnualized Run Rate (ARR): ${f.currency} ${f.arr.toLocaleString()}\nARPU: ${f.currency} ${f.arpu.toLocaleString()}\nCollected this period: ${f.currency} ${f.collectedThisPeriod.toLocaleString()} (${f.collectionRatePercent}% collection rate)\nOutstanding receivables: ${f.currency} ${f.totalArOutstanding.toLocaleString()}\nTrial balance status: ${
+        f.trialBalanceBalanced ? "BALANCED (0.00 discrepancy)" : "Discrepancy detected"
+      }\nUnmatched payments: ${f.unmatchedPaymentsCount}\nPending approvals: ${
         f.pendingApprovalsCount
-      }** Maker-Checker approval request(s)`,
+      }`,
       metricsCited: [
         { label: "MRR", value: `${f.currency} ${f.mrr.toLocaleString()}` },
         { label: "ARPU", value: `${f.currency} ${f.arpu.toLocaleString()}` },
@@ -1525,10 +1766,10 @@ export function executeCopilotIntelligence(params: {
           ? [
               {
                 actionId: "act-open-recon",
-                label: `Review ${f.unmatchedPaymentsCount} Unmatched Payment(s) in Reconciliation Queue`,
+                label: `Review ${f.unmatchedPaymentsCount} Unmatched Payments in Reconciliation Queue`,
                 permissionRequired: "billing.reconcile",
                 requiresConfirmation: true,
-                commandPreview: `NAVIGATE /billing?tab=reconciliation`,
+                commandPreview: `Open reconciliation queue in Billing (${f.unmatchedPaymentsCount} unmatched payments)`,
               },
             ]
           : [],
@@ -1537,13 +1778,13 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 9. ROUTER SESSIONS, UNHEALTHY ROUTERS, OUTAGES & NETWORK HEALTH (Rules 19, 44)
+  // 9. ROUTER SESSIONS, OFFLINE/UNHEALTHY ROUTERS, OUTAGES & NETWORK HEALTH
   // ==========================================================================
   if (
     /\b(router|routers|olt|outage|outages|network|blast|noc|unhealthy|active sessions|affected)\b/i.test(
       q
     ) &&
-    !/\b(how do i|where can i|where do i)\b/i.test(q)
+    !/\b(how do i|where can i|where do i|can i)\b/i.test(q)
   ) {
     const rtrHealthRes = toolkit.getRouterHealth();
     const rtrSessionsRes = toolkit.getRouterSessions();
@@ -1554,7 +1795,8 @@ export function executeCopilotIntelligence(params: {
         intent: "PERMISSION_DENIED",
         headline: "Permission Required",
         answerMarkdown:
-          rtrHealthRes.message || "You don't have permission to view router and NOC telemetry.",
+          rtrHealthRes.message ||
+          "You don't have permission to view router and network monitoring data.",
         metricsCited: [],
         proposedActions: [],
       });
@@ -1564,32 +1806,73 @@ export function executeCopilotIntelligence(params: {
     const routerSessions = rtrSessionsRes.data ?? [];
     const incidents = incidentsRes.data;
 
-    // 9a. "Which router has the most active sessions?"
+    // Simple question: "Which routers are offline?"
+    if (/\b(which routers are offline|routers offline|offline routers)\b/i.test(q)) {
+      const offlineRouters = routers.filter((r) => r.status !== "ONLINE");
+      if (offlineRouters.length === 0) {
+        return finalize({
+          intent: "ROUTER_SESSIONS_AND_HEALTH",
+          headline: "All Routers Online",
+          answerMarkdown: `No routers are currently offline. All ${routers.length} MikroTik routers are online.`,
+          metricsCited: [
+            {
+              label: "Routers Online",
+              value: `${routers.length}/${routers.length}`,
+            },
+          ],
+          proposedActions: [],
+          confidenceLevel: "CONFIRMED",
+        });
+      }
+      const offlineText = offlineRouters
+        .map(
+          (r) =>
+            `Router: ${r.name} | POP: ${r.siteName || "—"} | Status: ${r.status}`
+        )
+        .join("\n");
+      return finalize({
+        intent: "ROUTER_SESSIONS_AND_HEALTH",
+        headline: `Offline Routers (${offlineRouters.length})`,
+        answerMarkdown: `${offlineRouters.length} router(s) currently offline:\n${offlineText}`,
+        metricsCited: [
+          { label: "Offline Routers", value: String(offlineRouters.length) },
+        ],
+        proposedActions: [],
+        confidenceLevel: "CONFIRMED",
+      });
+    }
+
+    // "Which router has the most active sessions?"
     if (/\b(most active sessions|most sessions|highest sessions)\b/i.test(q)) {
       const topRtr = routerSessions[0];
       const rows = routerSessions
         .map(
           (r, i) =>
-            `| ${i + 1} | **${r.routerName}** | ${r.siteName || "—"} | **${
-              r.totalActiveSessions
-            }** | ${r.cpuLoad}% | ${r.status} |`
+            `${i + 1}. Router: ${r.routerName} | POP: ${
+              r.siteName || "—"
+            } | Active sessions: ${r.totalActiveSessions} | CPU load: ${
+              r.cpuLoad
+            }% | Status: ${r.status}`
         )
         .join("\n");
 
       return finalize({
         intent: "ROUTER_SESSIONS_AND_HEALTH",
-        headline: `Router Session Ranking — Top: ${topRtr?.routerName || "N/A"} (${
+        headline: `Router Session Ranking: ${topRtr?.routerName || "N/A"} (${
           topRtr?.totalActiveSessions ?? 0
         } Active Sessions)`,
-        answerMarkdown: `**${topRtr?.routerName || "N/A"}** at **${
+        answerMarkdown: `${topRtr?.routerName || "N/A"} at ${
           topRtr?.siteName || "—"
-        }** carries the highest load with **${
+        } has the highest load with ${
           topRtr?.totalActiveSessions ?? 0
-        } active sessions**.\n\n| # | Router | POP / Site | Active Sessions | CPU Load | Status |\n| :--- | :--- | :--- | ---: | ---: | :--- |\n${rows}`,
+        } active sessions.\n\nRouter session breakdown:\n${rows}`,
         metricsCited: topRtr
           ? [
               { label: "Top Router", value: topRtr.routerName },
-              { label: "Active Sessions", value: String(topRtr.totalActiveSessions) },
+              {
+                label: "Active Sessions",
+                value: String(topRtr.totalActiveSessions),
+              },
               { label: "CPU Load", value: `${topRtr.cpuLoad}%` },
             ]
           : [],
@@ -1598,59 +1881,60 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // 9b. "Which routers are unhealthy?" / "Are there any active outages?" / "Which customers are affected?"
     if (
       /\b(unhealthy|causing the most problems|outage|outages|affected|having problems)\b/i.test(
         q
       )
     ) {
-      const flaggedRouters = routers.filter((r) => !r.isHealthy || r.cpuLoad >= 40);
+      const flaggedRouters = routers.filter(
+        (r) => !r.isHealthy || r.cpuLoad >= 40
+      );
       const losOnts = incidents?.losOnts ?? [];
       const degradedNodes = incidents?.degradedNodes ?? [];
       const openAlerts = incidents?.openAlerts ?? [];
 
       const rtrLines =
         flaggedRouters.length === 0
-          ? "- All MikroTik BNG routers are `ONLINE` with normal CPU/memory utilization."
+          ? "All MikroTik routers are online with normal CPU and memory utilization."
           : flaggedRouters
               .map(
                 (r) =>
-                  `- **${r.name}** (${r.siteName}): Status \`${r.status}\` · CPU **${
-                    r.cpuLoad
-                  }%** · Active Sessions: **${r.activeSessions}** · Flags: ${
-                    r.unhealthyReasons.join(", ") || "None"
-                  }`
+                  `Router: ${r.name} (${r.siteName}) | Status: ${
+                    r.status
+                  } | CPU: ${r.cpuLoad}% | Active sessions: ${
+                    r.activeSessions
+                  } | Alerts: ${r.unhealthyReasons.join(", ") || "None"}`
               )
               .join("\n");
 
       const ontLines =
         losOnts.length === 0
-          ? "- Zero GPON ONT optical Loss-of-Signal (`LOS`) alarms."
+          ? "Zero optical loss of signal alarms."
           : losOnts
               .map(
                 (o) =>
-                  `- **${o.customerName}** (\`${o.accountNumber}\`): ONT \`${
+                  `Customer: ${o.customerName} (${o.accountNumber}) | ONT: ${
                     o.serialNumber
-                  }\` on \`${o.ponPortLabel}\` (${o.oltName}) reporting **${
+                  } on ${o.ponPortLabel} (${o.oltName}) | Status: ${
                     o.status
-                  } (${o.rxPowerDbm.toFixed(1)} dBm)**`
+                  } (${o.rxPowerDbm.toFixed(1)} dBm)`
               )
               .join("\n");
 
       const nodeLines =
         degradedNodes.length === 0
-          ? "- All fiber distribution splitters (NAP/FAT) are operating normally."
+          ? "All fiber distribution splitters are operating normally."
           : degradedNodes
               .map(
                 (n) =>
-                  `- **${n.name}** (\`${n.nodeCode}\`): Status **${n.status}** · Latency **${n.latencyMs} ms** · Utilization **${n.utilizationPercent}%** · **${n.subscriberCount} subscribers** on node`
+                  `Node: ${n.name} (${n.nodeCode}) | Status: ${n.status} | Latency: ${n.latencyMs} ms | Utilization: ${n.utilizationPercent}% | Subscribers on node: ${n.subscriberCount}`
               )
               .join("\n");
 
       return finalize({
         intent: "NETWORK_AND_OUTAGE_STATUS",
-        headline: `Active Network Incidents, Router Health & Affected Subscribers`,
-        answerMarkdown: `### Router Fleet Warnings\n${rtrLines}\n\n### Fiber Distribution & Topology Alerts\n${nodeLines}\n\n### Affected Subscribers (Optical LOS / Outage)\n${ontLines}`,
+        headline: "Active Network Incidents, Router Health, and Affected Subscribers",
+        answerMarkdown: `Router fleet warnings:\n${rtrLines}\n\nDistribution node alerts:\n${nodeLines}\n\nAffected subscribers:\n${ontLines}`,
         metricsCited: [
           {
             label: "Routers Online",
@@ -1665,8 +1949,9 @@ export function executeCopilotIntelligence(params: {
       });
     }
 
-    // 9c. General Network & NOC Status (backward-compatible with Phase 6 test)
-    const onlineRoutersCount = routers.filter((r) => r.status === "ONLINE").length;
+    const onlineRoutersCount = routers.filter(
+      (r) => r.status === "ONLINE"
+    ).length;
     const oltsCount = dataset.olts.filter(
       (o) => o.organizationId === ctx.organizationId
     ).length;
@@ -1682,11 +1967,8 @@ export function executeCopilotIntelligence(params: {
 
     return finalize({
       intent: "NETWORK_AND_OUTAGE_STATUS",
-      headline: "NOC Control Plane, MikroTik Fleet & GPON OLT Telemetry",
-      answerMarkdown: `- **Overall Network Status**: **${overallHealth}**
-- **MikroTik BNG Fleet**: **${onlineRoutersCount}/${routers.length}** routers online via WireGuard tunnel
-- **GPON/XGS-PON OLTs**: **${oltsCount}** chassis active · **${losOntCount}** ONT(s) with optical alarm
-- **Active NOC Alerts**: **${openAlertsCount}** open alert(s) correlated across topology tree`,
+      headline: "Network Operations and Router Health Summary",
+      answerMarkdown: `Overall network status: ${overallHealth}\nMikroTik routers online: ${onlineRoutersCount} of ${routers.length}\nActive OLT units: ${oltsCount}\nONT optical alarms: ${losOntCount}\nOpen network alerts: ${openAlertsCount}`,
       metricsCited: [
         {
           label: "Routers Online",
@@ -1702,48 +1984,58 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 10. BUSINESS PERFORMANCE EXECUTIVE SUMMARY (Rule 45)
+  // 10. BUSINESS PERFORMANCE EXECUTIVE SUMMARY (Section 13)
   // ==========================================================================
-  if (/\b(how is the business performing|business performance|executive summary)\b/i.test(q)) {
+  if (
+    /\b(how is the business performing|business performance|executive summary)\b/i.test(
+      q
+    )
+  ) {
     const growth = toolkit.getCustomerGrowth().data;
     const rev = toolkit.getRevenueMetrics().data;
     const churn = toolkit.getChurnMetrics().data;
     const routers = toolkit.getRouterHealth().data ?? [];
+    const onlineRouters = routers.filter((r) => r.status === "ONLINE").length;
 
     return finalize({
       intent: "BUSINESS_PERFORMANCE_SUMMARY",
-      headline: `${ctx.organizationName} — Executive Business & Operations Performance`,
-      answerMarkdown: `### 1. Subscriber Base & Retention\n- **Total Subscribers:** **${
-        growth?.totalCustomers ?? 0
-      }** (**${growth?.activeCustomers ?? 0}** active, **${
-        growth?.suspendedCustomers ?? 0
-      }** suspended, **${
-        growth?.pendingInstallations ?? 0
-      }** pending installation)\n- **Retention & Churn Risk:** **${
-        churn?.atRiskCount ?? 0
-      }** subscriber(s) flagged for proactive retention or optical link attention\n\n### 2. Financial Performance\n- **Monthly Recurring Revenue (MRR):** **${
-        ctx.currency
-      } ${(rev?.mrr ?? 0).toLocaleString()}** (ARR: **${ctx.currency} ${(
-        rev?.arr ?? 0
-      ).toLocaleString()}**)\n- **ARPU:** **${ctx.currency} ${(
-        rev?.arpu ?? 0
-      ).toLocaleString()}**\n- **Collections Efficiency:** **${
-        rev?.collectionRatePercent ?? 0
-      }%** (**${ctx.currency} ${(
-        rev?.collectedThisPeriod ?? 0
-      ).toLocaleString()}** collected)\n- **Outstanding Accounts Receivable:** **${
-        ctx.currency
-      } ${(rev?.totalArOutstanding ?? 0).toLocaleString()}**\n\n### 3. Network Infrastructure Availability\n- **MikroTik BNG Routers:** **${
-        routers.filter((r) => r.status === "ONLINE").length
-      }/${routers.length}** online`,
+      headline: `${ctx.organizationName} Business Performance`,
+      answerMarkdown: [
+        "Business performance",
+        "Subscriber Base and Retention",
+        `Total subscribers: ${growth?.totalCustomers ?? 0}`,
+        `Active: ${growth?.activeCustomers ?? 0}`,
+        `Suspended: ${growth?.suspendedCustomers ?? 0}`,
+        `Pending installation: ${growth?.pendingInstallations ?? 0}`,
+        `Retention and optical alerts: ${churn?.atRiskCount ?? 0}`,
+        "",
+        "Financial Performance",
+        `Monthly Recurring Revenue (MRR): ${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}`,
+        `ARR: ${ctx.currency} ${(rev?.arr ?? 0).toLocaleString()}`,
+        `ARPU: ${ctx.currency} ${(rev?.arpu ?? 0).toLocaleString()}`,
+        `Collection rate: ${rev?.collectionRatePercent ?? 0}% (${ctx.currency} ${(rev?.collectedThisPeriod ?? 0).toLocaleString()} collected)`,
+        `Outstanding receivables: ${ctx.currency} ${(rev?.totalArOutstanding ?? 0).toLocaleString()}`,
+        "",
+        "Network Availability",
+        `Routers online: ${onlineRouters} of ${routers.length}`,
+      ].join("\n"),
       metricsCited: [
         {
           label: "Active Subscribers",
           value: `${growth?.activeCustomers ?? 0}/${growth?.totalCustomers ?? 0}`,
         },
-        { label: "MRR", value: `${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}` },
-        { label: "ARPU", value: `${ctx.currency} ${(rev?.arpu ?? 0).toLocaleString()}` },
-        { label: "Collection Rate", value: `${rev?.collectionRatePercent ?? 0}%` },
+        {
+          label: "MRR",
+          value: `${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}`,
+        },
+        {
+          label: "ARPU",
+          value: `${ctx.currency} ${(rev?.arpu ?? 0).toLocaleString()}`,
+        },
+        {
+          label: "Collection Rate",
+          value: `${rev?.collectionRatePercent ?? 0}%`,
+        },
       ],
       proposedActions: [],
       confidenceLevel: "CONFIRMED",
@@ -1751,39 +2043,32 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 11. FEATURE EXPLANATION & NAVIGATION ASSISTANCE (Rules 11, 12, 42, 43)
+  // 11. FEATURE EXPLANATION & NAVIGATION ASSISTANCE (Sections 9, 16, 39)
   // ==========================================================================
   if (
-    /\b(how does|how do i|where do i|where can i|what does this|explain|configure|captive portal|add a subscriber|create a package|connect a mikrotik|reconcile a payment)\b/i.test(
+    /\b(how does|how do i|where do i|where can i|what does this|explain|configure|can i|captive portal|add a subscriber|create a package|connect a mikrotik|reconcile a payment)\b/i.test(
       q
     )
   ) {
     const capRes = toolkit.getFeatureCapabilities(prompt);
     const matched = capRes.data?.[0];
     if (matched) {
-      const howSteps = matched.howItWorks.map((s) => `- ${s}`).join("\n");
-      const actionsList = matched.availableActions.map((a) => `- ${a}`).join("\n");
+      const howSteps = matched.howItWorks.join("\n");
+      const actionsList = matched.availableActions.join("\n");
+
+      const technicalFooter = allowTechnical
+        ? `\n\nTechnical route: ${matched.route}${
+            matched.apiEndpoints.length > 0
+              ? ` | API endpoints: ${matched.apiEndpoints.join(", ")}`
+              : ""
+          }`
+        : "";
 
       return finalize({
         intent: "FEATURE_AND_NAVIGATION_GUIDE",
-        headline: `${matched.featureName} — Navigation & Implementation Guide`,
-        answerMarkdown: `- **Application Route:** \`${matched.route}\`${
-          matched.apiEndpoints.length > 0
-            ? ` (APIs: \`${matched.apiEndpoints.join("`, `")}\`)`
-            : ""
-        }\n- **Module:** ${matched.module}\n- **Overview:** ${
-          matched.description
-        }\n\n### How It Works in QC NetCore\n${howSteps}\n\n### Available Operator Actions\n${actionsList}\n\n### Authoritative Data Sources & Permissions\n- **Tables / Sources:** \`${matched.authoritativeDataSources.join(
-          "`, `"
-        )}\`\n- **Required RBAC Permissions:** \`${matched.requiredPermissions.join(
-          "`, `"
-        )}\`\n- **Configuration Prerequisite:** ${matched.configurationRequirements.join(
-          " "
-        )}`,
-        metricsCited: [
-          { label: "Route", value: matched.route },
-          { label: "Module", value: matched.module },
-        ],
+        headline: matched.featureName,
+        answerMarkdown: `${matched.description}\n\nWhere to access it: You can manage this from the ${matched.navigationSection}.\n\nHow it works:\n${howSteps}\n\nAvailable actions:\n${actionsList}${technicalFooter}`,
+        metricsCited: [{ label: "Section", value: matched.module }],
         proposedActions: [],
         confidenceLevel: "CONFIRMED",
       });
@@ -1791,7 +2076,7 @@ export function executeCopilotIntelligence(params: {
   }
 
   // ==========================================================================
-  // 12. DEFAULT: UNIFIED GLOBAL SEARCH OR GENERAL OPERATIONS BRIEF
+  // 12. DEFAULT: GENERAL OPERATIONS BRIEF
   // ==========================================================================
   const allSubs = toolkit.searchCustomers("").data ?? [];
   const rev = toolkit.getRevenueMetrics().data;
@@ -1804,18 +2089,17 @@ export function executeCopilotIntelligence(params: {
 
   return finalize({
     intent: "GENERAL_OPERATIONS_BRIEF",
-    headline: `${ctx.organizationName} — Live ISP Operating System Brief`,
-    answerMarkdown: `- **Subscribers**: **${allSubs.length}** total (**${activeSubsCount}** active, **${onlineSubsCount}** online sessions)
-- **Financials**: **${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}** MRR · **${
-      rev?.collectionRatePercent ?? 0
-    }%** collection rate · Trial Balance **${
-      rev?.trialBalanceBalanced ? "Verified" : "Check Needed"
-    }**
-- **Network & Fiber**: **${onlineRoutersCount}/${
+    headline: `${ctx.organizationName} Operations Summary`,
+    answerMarkdown: `Subscribers: ${allSubs.length} total (${activeSubsCount} active, ${onlineSubsCount} online sessions)\nMonthly Recurring Revenue: ${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()} (${rev?.collectionRatePercent ?? 0}% collection rate)\nTrial balance: ${
+      rev?.trialBalanceBalanced ? "Verified" : "Review needed"
+    }\nNetwork availability: ${onlineRoutersCount} of ${
       routers.length
-    }** MikroTik routers online · **${dataset.olts.length}** OLT(s) monitored`,
+    } MikroTik routers online, ${dataset.olts.length} OLT units monitored`,
     metricsCited: [
-      { label: "MRR", value: `${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}` },
+      {
+        label: "MRR",
+        value: `${ctx.currency} ${(rev?.mrr ?? 0).toLocaleString()}`,
+      },
       {
         label: "Online Sessions",
         value: `${onlineSubsCount}/${allSubs.length}`,
