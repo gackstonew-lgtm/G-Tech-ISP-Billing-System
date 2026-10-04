@@ -1,272 +1,130 @@
 "use client";
-import React, { useState } from "react";
-import Link from "next/link";
-import {
-  Wifi,
-  Ticket,
-  Zap,
-  Phone,
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  HelpCircle,
-  Radio,
-  Sun,
-  Moon,
-} from "lucide-react";
-import { SEED_PLANS } from "@/lib/db/mock-db";
-import { formatKES } from "@/lib/utils";
-import { MpesaService } from "@/lib/payments/mpesa";
-import { useTheme } from "@/components/theme/ThemeProvider";
-import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
-import { GlassBadge } from "@/components/ui/GlassBadge";
-import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
+import React, { useEffect, useState } from "react";
+import { Wifi } from "lucide-react";
+import { PortalRenderer } from "@/components/captive/PortalRenderer";
+import { getDefaultPortalConfig, type PlanLike, type PortalConfig } from "@/lib/captive/config";
 
+interface PortalPayload {
+  config: PortalConfig;
+  plans: PlanLike[];
+  methods: string[];
+  organizationName: string;
+  isDraftPreview: boolean;
+}
+
+/**
+ * Public hotspot captive portal.
+ *   /captive?org=<slug>          → that ISP's PUBLISHED design
+ *   /captive?org=<slug>&preview=draft → the signed-in admin's own DRAFT ("Test" step)
+ * Without ?org the host header is used (future custom domains).
+ */
 export default function CaptivePortalPage() {
-  const hotspotPlans = SEED_PLANS.filter((p) => p.serviceType === "HOTSPOT");
-  const [activeTab, setActiveTab] = useState<"MPESA" | "VOUCHER">("MPESA");
-  const { theme, toggleTheme } = useTheme();
+  const [data, setData] = useState<PortalPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // M-Pesa Checkout State
-  const [selectedPlan, setSelectedPlan] = useState(hotspotPlans[0]);
-  const [phone, setPhone] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [stkMessage, setStkMessage] = useState<string | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const params = new URLSearchParams(window.location.search);
+    const org = params.get("org");
+    const wantsDraft = params.get("preview") === "draft";
 
-  // Voucher Login State
-  const [voucherCode, setVoucherCode] = useState("");
-  const [voucherStatus, setVoucherStatus] = useState<string | null>(null);
+    (async () => {
+      try {
+        if (wantsDraft) {
+          const res = await fetch("/api/v1/captive/config", { signal: ctrl.signal, cache: "no-store" });
+          const json = await res.json();
+          if (json?.success) {
+            setData({
+              config: json.data.draft ?? getDefaultPortalConfig(json.data.organization?.name),
+              plans: json.data.plans ?? [],
+              methods: ["voucher", "mpesa"],
+              organizationName: json.data.organization?.name ?? "",
+              isDraftPreview: true,
+            });
+            return;
+          }
+          setError("Sign in as an administrator to preview your draft.");
+          return;
+        }
+        const res = await fetch(`/api/v1/captive/public${org ? `?org=${encodeURIComponent(org)}` : ""}`, {
+          signal: ctrl.signal,
+        });
+        const json = await res.json();
+        if (!json?.success) {
+          setError(json?.message ?? "This WiFi portal is unavailable.");
+          return;
+        }
+        setData({
+          config: json.data.config,
+          plans: json.data.plans,
+          methods: json.data.methods,
+          organizationName: json.data.organization?.name ?? "",
+          isDraftPreview: false,
+        });
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") setError("The WiFi portal could not be loaded. Please try again.");
+      }
+    })();
+    return () => ctrl.abort();
+  }, []);
 
-  const handleMpesaPay = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone) return;
-    setIsProcessing(true);
-    setStkMessage("Sending STK Push prompt to your phone... Check your screen.");
-
-    const res = await MpesaService.initiateSTKPush({
-      phoneNumber: phone,
-      amount: selectedPlan.price,
-      accountReference: `HS-${selectedPlan.name.substring(0, 4)}`,
-      transactionDesc: `Hotspot ${selectedPlan.name}`,
-    });
-
-    if (res.success) {
-      setTimeout(() => {
-        setStkMessage(`Payment received! You are now connected to high-speed WiFi for ${selectedPlan.name}. Enjoy browsing!`);
-        setIsProcessing(false);
-      }, 2000);
+  // Tab title + favicon from the ISP's own branding.
+  useEffect(() => {
+    if (!data) return;
+    const prevTitle = document.title;
+    document.title = `${data.config.branding.businessName} — WiFi`;
+    let link: HTMLLinkElement | null = null;
+    let prevHref: string | null = null;
+    if (data.config.branding.faviconUrl) {
+      link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      prevHref = link.href;
+      link.href = data.config.branding.faviconUrl;
     }
-  };
+    return () => {
+      document.title = prevTitle;
+      if (link && prevHref) link.href = prevHref;
+    };
+  }, [data]);
 
-  const handleVoucherLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!voucherCode) return;
-    setIsProcessing(true);
-    setVoucherStatus("Authenticating voucher with FreeRADIUS AAA...");
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+        <div role="alert" className="max-w-sm space-y-3 text-center">
+          <Wifi className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
+          <h1 className="text-lg font-semibold">WiFi portal unavailable</h1>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
-    setTimeout(() => {
-      setVoucherStatus("Voucher Valid! Connected to QC NetCore High-Speed WiFi.");
-      setIsProcessing(false);
-    }, 1200);
-  };
+  if (!data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background" role="status" aria-label="Loading WiFi portal">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between selection:bg-primary/20 selection:text-primary transition-colors duration-200">
-      {/* Top Banner */}
-      <header className="border-b border-border-subtle bg-surface/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2.5 group">
-            <NexaNetLogo variant="horizontal" />
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              className="w-9 h-9 rounded-xl bg-surface border border-border text-foreground flex items-center justify-center hover:bg-surface-elevated transition shadow-xs"
-            >
-              {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-primary" />}
-            </button>
-            <Link
-              href="/dashboard"
-              className="text-[11px] font-bold text-foreground hover:text-primary px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-elevated transition shadow-xs"
-            >
-              Dashboard &rarr;
-            </Link>
-          </div>
+    <div className="flex min-h-screen flex-col">
+      {data.isDraftPreview && (
+        <div role="status" className="bg-warning-soft px-4 py-2 text-center text-xs font-semibold text-warning">
+          Draft preview — this design is not live yet. Publish it from Settings → Captive Portal Designer.
         </div>
-      </header>
-
-      {/* Main Captive Body */}
-      <main className="max-w-md mx-auto px-4 py-6 flex-1 w-full space-y-5">
-        {/* Welcome Header */}
-        <div className="text-center space-y-1">
-          <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
-            Connect to Free WiFi
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            Select a package below to buy via M-Pesa or enter a voucher code
-          </p>
-        </div>
-
-        {/* Tab Switcher (WebHunt Pill Design) */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-surface border border-border shadow-xs">
-          <button
-            onClick={() => setActiveTab("MPESA")}
-            className={`py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === "MPESA"
-                ? "bg-primary text-primary-foreground shadow-brand-btn"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Buy via M-Pesa
-          </button>
-          <button
-            onClick={() => setActiveTab("VOUCHER")}
-            className={`py-2 rounded-xl text-xs font-bold transition ${
-              activeTab === "VOUCHER"
-                ? "bg-primary text-primary-foreground shadow-brand-btn"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Use Voucher Code
-          </button>
-        </div>
-
-        {/* Tab 1: M-Pesa Package Selection */}
-        {activeTab === "MPESA" && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                1. Select WiFi Package
-              </label>
-              <div className="grid grid-cols-2 gap-2.5">
-                {hotspotPlans.map((plan) => {
-                  const isSelected = selectedPlan.id === plan.id;
-                  return (
-                    <div
-                      key={plan.id}
-                      onClick={() => setSelectedPlan(plan)}
-                      className={`p-3.5 rounded-2xl border cursor-pointer transition flex flex-col justify-between ${
-                        isSelected
-                          ? "bg-surface-elevated border-primary shadow-xs"
-                          : "bg-surface border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-foreground">
-                          {plan.name.replace("Hotspot ", "")}
-                        </span>
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
-                      </div>
-                      <div className="mt-2 flex items-baseline justify-between">
-                        <span className="text-base font-extrabold text-primary">
-                          {formatKES(plan.price)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground font-semibold">
-                          {plan.downloadSpeedKbps / 1024} Mbps
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* M-Pesa Input Form */}
-            <GlassCard>
-              <form onSubmit={handleMpesaPay} className="p-5 space-y-4">
-                <div>
-                  <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    2. Enter M-Pesa Phone Number
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="0712345678"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground font-mono focus:outline-none focus:border-primary font-bold"
-                    />
-                  </div>
-                </div>
-
-                {stkMessage && (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-start gap-2 font-semibold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                    <span className="leading-snug">{stkMessage}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="w-full py-3.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-sm transition flex items-center justify-center gap-2 shadow-brand-btn"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>
-                    {isProcessing ? "Processing..." : `Pay ${formatKES(selectedPlan.price)} & Connect`}
-                  </span>
-                </button>
-              </form>
-            </GlassCard>
-          </div>
-        )}
-
-        {/* Tab 2: Voucher Code Login */}
-        {activeTab === "VOUCHER" && (
-          <GlassCard>
-            <form onSubmit={handleVoucherLogin} className="p-6 space-y-4">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Enter Scratch Voucher Code
-                </label>
-                <div className="relative">
-                  <Ticket className="w-4 h-4 absolute left-3 top-3.5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. GT1H-9842-KLP"
-                    value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                    className="w-full pl-9 pr-3 py-3 rounded-xl bg-surface-elevated border border-border text-sm font-mono text-foreground tracking-wider uppercase focus:outline-none focus:border-primary font-bold"
-                  />
-                </div>
-              </div>
-
-              {voucherStatus && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2 font-semibold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <span>{voucherStatus}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isProcessing}
-                className="w-full py-3.5 px-4 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-sm transition flex items-center justify-center gap-2 shadow-brand-btn"
-              >
-                <span>{isProcessing ? "Connecting..." : "Connect to Internet"}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-          </GlassCard>
-        )}
-
-        {/* Support & Hotspot Notice */}
-        <div className="p-4 rounded-2xl bg-surface border border-border text-[11px] text-muted-foreground space-y-1 text-center shadow-xs">
-          <div>Need help or physical scratch vouchers? Contact Hotspot Admin:</div>
-          <div className="font-mono text-foreground font-extrabold">+254 712 345 678</div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border bg-surface-subtle py-4 text-center text-[11px] text-muted-foreground">
-        <p>&copy; 2026 QC NetCore Network &amp; Billing.</p>
-      </footer>
+      )}
+      <PortalRenderer
+        config={data.config}
+        plans={data.plans}
+        supportedMethods={data.methods}
+        mode="live"
+        className="flex-1"
+      />
     </div>
   );
 }

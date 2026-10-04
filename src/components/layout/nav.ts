@@ -10,6 +10,7 @@ import {
   UserCheck,
   Wifi,
   Settings,
+  Paintbrush,
 } from "lucide-react";
 
 /**
@@ -66,6 +67,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/portal", label: "Customer Self-Care", icon: UserCheck, keywords: "portal" },
       { href: "/captive", label: "Captive Portal", icon: Wifi, keywords: "hotspot login" },
+      { href: "/settings/captive-portal", label: "Portal Designer", icon: Paintbrush, keywords: "captive portal branding template customize hotspot login page" },
     ],
   },
   {
