@@ -32,6 +32,7 @@ import { useTheme } from "@/components/theme/ThemeProvider";
 import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
+import { PortalSelfServicePanels } from "@/components/portal/PortalSelfServicePanels";
 
 export default function CustomerPortalPage() {
   const customer = SEED_CUSTOMERS[0];
@@ -248,6 +249,11 @@ export default function CustomerPortalPage() {
             </GlassCard>
           </div>
         </div>
+
+        <PortalSelfServicePanels
+          accountNumber={customer.accountNumber}
+          customerName={customer.fullName}
+        />
       </main>
 
       {/* Footer */}

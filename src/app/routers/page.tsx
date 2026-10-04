@@ -12,10 +12,16 @@ import { cn, formatShortDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
+import {
+  RoutersModeTabs,
+  OltAndGisPanels,
+  type RoutersViewMode,
+} from "@/components/routers/OltAndGisPanels";
 
 export default function RoutersPage() {
   const { isDemoMode, isLoading: authLoading, user, organization } = useAuth();
 
+  const [viewMode, setViewMode] = useState<RoutersViewMode>("MIKROTIK_BNG");
   const [routers, setRouters] = useState<Router[]>([]);
   const [selectedRouterForScript, setSelectedRouterForScript] = useState<Router | null>(null);
   const [copied, setCopied] = useState(false);
@@ -122,100 +128,106 @@ export default function RoutersPage() {
 
       {loadError && <ErrorState title="Could not load routers" detail={loadError} onRetry={fetchRouters} />}
 
-      <section className="rounded-lg border border-border bg-surface shadow-xs">
-        {isLoading ? (
-          <TableSkeleton rows={4} cols={6} />
-        ) : routers.length === 0 ? (
-          <EmptyState
-            icon={RouterIcon}
-            title="No routers yet"
-            description="Add your first MikroTik router to monitor its status and sessions. Generate a provisioning script to connect it."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[56rem] text-left text-sm">
-              <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
-                <tr>
-                  <th scope="col" className="px-3 py-2 font-medium">Router</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Tunnel / IP</th>
-                  <th scope="col" className="px-3 py-2 font-medium">RouterOS</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">CPU</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Free RAM</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Sessions</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Uptime</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Last seen</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {routers.map((router) => {
-                  const result = testResults[router.id];
-                  const isTesting = testingRouterId === router.id;
-                  return (
-                    <React.Fragment key={router.id}>
-                      <tr className="hover:bg-surface-subtle">
-                        <td className="px-3 py-2">
-                          <div className="font-medium leading-5">{router.name}</div>
-                          <div className="text-xs text-muted-foreground">{router.boardModel || "MikroTik"}</div>
-                        </td>
-                        <td className="px-3 py-2"><StatusBadge status={router.status} /></td>
-                        <td className="tabular px-3 py-2 font-mono text-xs">{router.wireguardTunnelIp || router.managementIp}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{router.routerosVersion || "—"}</td>
-                        <td className={cn("tabular px-3 py-2 text-right", router.cpuLoad >= 80 && "font-medium text-danger")}>
-                          {router.cpuLoad}%
-                        </td>
-                        <td className="tabular px-3 py-2 text-right">{router.freeMemoryMb} MB</td>
-                        <td className="tabular px-3 py-2 text-right">{router.activeSessions ?? 0}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{router.uptime || "—"}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{formatShortDate(router.lastSeenAt)}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              onClick={() => handleTestConnection(router)}
-                              disabled={isTesting}
-                              className={btnClass("secondary", "h-8 px-2.5")}
-                            >
-                              <RefreshCw className={cn("h-3.5 w-3.5", isTesting && "animate-spin")} aria-hidden="true" />
-                              {isTesting ? "Testing" : "Test"}
-                            </button>
-                            <button
-                              onClick={() => setSelectedRouterForScript(router)}
-                              className={btnClass("ghost", "h-8 px-2.5")}
-                              aria-label={`Provisioning script for ${router.name}`}
-                            >
-                              <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
-                              Script
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {result && (
-                        <tr>
-                          <td colSpan={10} className="px-3 pb-2">
-                            <div
-                              role="status"
-                              className={cn(
-                                "rounded-md border px-3 py-1.5 text-xs",
-                                result.latency >= 0
-                                  ? "border-success/30 bg-success-soft text-success"
-                                  : "border-danger/30 bg-danger-soft text-danger"
-                              )}
-                            >
-                              {result.msg}
-                              {result.latency >= 0 ? ` · ${result.latency} ms` : ""}
+      <RoutersModeTabs mode={viewMode} onChange={setViewMode} />
+
+      <OltAndGisPanels mode={viewMode} />
+
+      {viewMode === "MIKROTIK_BNG" && (
+        <section className="rounded-lg border border-border bg-surface shadow-xs">
+          {isLoading ? (
+            <TableSkeleton rows={4} cols={6} />
+          ) : routers.length === 0 ? (
+            <EmptyState
+              icon={RouterIcon}
+              title="No routers yet"
+              description="Add your first MikroTik router to monitor its status and sessions. Generate a provisioning script to connect it."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[56rem] text-left text-sm">
+                <thead className="border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-medium">Router</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Tunnel / IP</th>
+                    <th scope="col" className="px-3 py-2 font-medium">RouterOS</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">CPU</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Free RAM</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Sessions</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Uptime</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Last seen</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {routers.map((router) => {
+                    const result = testResults[router.id];
+                    const isTesting = testingRouterId === router.id;
+                    return (
+                      <React.Fragment key={router.id}>
+                        <tr className="hover:bg-surface-subtle">
+                          <td className="px-3 py-2">
+                            <div className="font-medium leading-5">{router.name}</div>
+                            <div className="text-xs text-muted-foreground">{router.boardModel || "MikroTik"}</div>
+                          </td>
+                          <td className="px-3 py-2"><StatusBadge status={router.status} /></td>
+                          <td className="tabular px-3 py-2 font-mono text-xs">{router.wireguardTunnelIp || router.managementIp}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{router.routerosVersion || "—"}</td>
+                          <td className={cn("tabular px-3 py-2 text-right", router.cpuLoad >= 80 && "font-medium text-danger")}>
+                            {router.cpuLoad}%
+                          </td>
+                          <td className="tabular px-3 py-2 text-right">{router.freeMemoryMb} MB</td>
+                          <td className="tabular px-3 py-2 text-right">{router.activeSessions ?? 0}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{router.uptime || "—"}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{formatShortDate(router.lastSeenAt)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                onClick={() => handleTestConnection(router)}
+                                disabled={isTesting}
+                                className={btnClass("secondary", "h-8 px-2.5")}
+                              >
+                                <RefreshCw className={cn("h-3.5 w-3.5", isTesting && "animate-spin")} aria-hidden="true" />
+                                {isTesting ? "Testing" : "Test"}
+                              </button>
+                              <button
+                                onClick={() => setSelectedRouterForScript(router)}
+                                className={btnClass("ghost", "h-8 px-2.5")}
+                                aria-label={`Provisioning script for ${router.name}`}
+                              >
+                                <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
+                                Script
+                              </button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                        {result && (
+                          <tr>
+                            <td colSpan={10} className="px-3 pb-2">
+                              <div
+                                role="status"
+                                className={cn(
+                                  "rounded-md border px-3 py-1.5 text-xs",
+                                  result.latency >= 0
+                                    ? "border-success/30 bg-success-soft text-success"
+                                    : "border-danger/30 bg-danger-soft text-danger"
+                                )}
+                              >
+                                {result.msg}
+                                {result.latency >= 0 ? ` · ${result.latency} ms` : ""}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
 
       {selectedRouterForScript && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">

@@ -6,10 +6,13 @@ export type UserRole =
   | 'super_admin'
   | 'isp_owner'
   | 'isp_admin'
+  | 'noc_engineer'
   | 'finance'
   | 'support'
   | 'technician'
   | 'agent'
+  | 'auditor'
+  | 'reseller'
   | 'customer';
 
 export interface User {

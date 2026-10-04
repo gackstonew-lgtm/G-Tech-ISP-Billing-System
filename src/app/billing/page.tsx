@@ -11,6 +11,11 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
 import { usePageSize } from "@/lib/preferences";
+import {
+  BillingModeTabs,
+  FinancialOsPanels,
+  type BillingTabMode,
+} from "@/components/billing/FinancialOsPanels";
 
 const METHOD_LABEL: Record<Payment["paymentMethod"], string> = {
   MPESA_EXPRESS: "M-Pesa STK",
@@ -35,6 +40,7 @@ export default function BillingPage() {
   const { isDemoMode, isLoading: authLoading, user } = useAuth();
   const [PAGE_SIZE] = usePageSize();
 
+  const [activeMode, setActiveMode] = useState<BillingTabMode>("PAYMENTS");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -193,141 +199,149 @@ export default function BillingPage() {
 
       {loadError && <ErrorState title="Could not load payments" detail={loadError} onRetry={loadPayments} />}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          { label: "Collected", value: formatKES(totalCollected), ctx: "Successful payments loaded" },
-          { label: "Successful", value: counts.COMPLETED, ctx: "Transactions" },
-          { label: "Pending", value: counts.PENDING, ctx: "Awaiting confirmation", tone: counts.PENDING > 0 ? "text-warning" : "" },
-          { label: "Failed", value: counts.FAILED, ctx: "Not completed", tone: counts.FAILED > 0 ? "text-danger" : "" },
-        ].map((m) => (
-          <div key={m.label} className="rounded-lg border border-border bg-surface p-3 shadow-xs">
-            <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
-            <div className={cn("tabular mt-1 text-xl font-semibold tracking-tight", m.tone)}>{isLoading ? "—" : m.value}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{m.ctx}</div>
-          </div>
-        ))}
-      </div>
+      <BillingModeTabs mode={activeMode} onChange={setActiveMode} />
 
-      <section className="rounded-lg border border-border bg-surface shadow-xs">
-        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative lg:w-80">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-            <input
-              type="search"
-              aria-label="Search payments"
-              placeholder="Search reference, phone or name"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={cn(inputClass, "pl-8")}
-            />
-          </div>
-          <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <button
-                key={f.value}
-                aria-pressed={filter === f.value}
-                onClick={() => setFilter(f.value)}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors",
-                  filter === f.value
-                    ? "border-primary bg-primary-soft font-medium text-primary"
-                    : "border-border text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
-                )}
-              >
-                {f.label}
-                <span className="tabular text-xs opacity-80">{counts[f.value]}</span>
-              </button>
+      <FinancialOsPanels mode={activeMode} />
+
+      {activeMode === "PAYMENTS" && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: "Collected", value: formatKES(totalCollected), ctx: "Successful payments loaded" },
+              { label: "Successful", value: counts.COMPLETED, ctx: "Transactions" },
+              { label: "Pending", value: counts.PENDING, ctx: "Awaiting confirmation", tone: counts.PENDING > 0 ? "text-warning" : "" },
+              { label: "Failed", value: counts.FAILED, ctx: "Not completed", tone: counts.FAILED > 0 ? "text-danger" : "" },
+            ].map((m) => (
+              <div key={m.label} className="rounded-lg border border-border bg-surface p-3 shadow-xs">
+                <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
+                <div className={cn("tabular mt-1 text-xl font-semibold tracking-tight", m.tone)}>{isLoading ? "—" : m.value}</div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{m.ctx}</div>
+              </div>
             ))}
           </div>
-        </div>
 
-        {isLoading ? (
-          <TableSkeleton rows={8} cols={6} />
-        ) : filtered.length === 0 ? (
-          payments.length === 0 ? (
-            <EmptyState
-              icon={CreditCard}
-              title="No payments yet"
-              description="Payments confirmed through M-Pesa will be listed here automatically."
-            />
-          ) : (
-            <EmptyState
-              icon={CreditCard}
-              title="No payments match"
-              description="Try a different search or filter."
-              action={
-                <button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilter("ALL");
-                  }}
-                  className={btnClass("secondary")}
-                >
-                  Clear filters
-                </button>
-              }
-            />
-          )
-        ) : (
-          <>
-            <div className="max-h-[calc(100vh-27rem)] min-h-48 overflow-auto">
-              <table className="w-full min-w-[46rem] text-left text-sm">
-                <thead className="sticky top-0 z-10 border-b border-border bg-surface-subtle text-xs text-muted-foreground">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 font-medium">Reference</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Subscriber</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Phone</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Method</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Status</th>
-                    <th scope="col" className="px-3 py-2 font-medium">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle">
-                  {rows.map((pay) => (
-                    <tr key={pay.id} className="hover:bg-surface-subtle">
-                      <td className="px-3 py-2 font-mono text-xs font-medium">{pay.transactionReference}</td>
-                      <td className="px-3 py-2">
-                        <div className="leading-5">{pay.customerName || pay.senderName || "Unmatched"}</div>
-                        <div className="font-mono text-xs text-muted-foreground">{pay.accountNumber || "No account"}</div>
-                      </td>
-                      <td className="tabular px-3 py-2">{pay.msisdnPhone}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{METHOD_LABEL[pay.paymentMethod] ?? pay.paymentMethod}</td>
-                      <td className="tabular px-3 py-2 text-right font-medium">{formatKES(pay.amount)}</td>
-                      <td className="px-3 py-2"><StatusBadge status={pay.status} /></td>
-                      <td className="px-3 py-2 text-muted-foreground">{formatShortDate(pay.processedAt ?? pay.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex items-center justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground">
-              <span className="tabular">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  aria-label="Previous page"
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="tabular px-2">{page} / {pageCount}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={page === pageCount}
-                  aria-label="Next page"
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+          <section className="rounded-lg border border-border bg-surface shadow-xs">
+            <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative lg:w-80">
+                <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <input
+                  type="search"
+                  aria-label="Search payments"
+                  placeholder="Search reference, phone or name"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={cn(inputClass, "pl-8")}
+                />
+              </div>
+              <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.value}
+                    aria-pressed={filter === f.value}
+                    onClick={() => setFilter(f.value)}
+                    className={cn(
+                      "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors",
+                      filter === f.value
+                        ? "border-primary bg-primary-soft font-medium text-primary"
+                        : "border-border text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                    )}
+                  >
+                    {f.label}
+                    <span className="tabular text-xs opacity-80">{counts[f.value]}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          </>
-        )}
-      </section>
+
+            {isLoading ? (
+              <TableSkeleton rows={8} cols={6} />
+            ) : filtered.length === 0 ? (
+              payments.length === 0 ? (
+                <EmptyState
+                  icon={CreditCard}
+                  title="No payments yet"
+                  description="Payments confirmed through M-Pesa will be listed here automatically."
+                />
+              ) : (
+                <EmptyState
+                  icon={CreditCard}
+                  title="No payments match"
+                  description="Try a different search or filter."
+                  action={
+                    <button
+                      onClick={() => {
+                        setSearchTerm("");
+                        setFilter("ALL");
+                      }}
+                      className={btnClass("secondary")}
+                    >
+                      Clear filters
+                    </button>
+                  }
+                />
+              )
+            ) : (
+              <>
+                <div className="max-h-[calc(100vh-27rem)] min-h-48 overflow-auto">
+                  <table className="w-full min-w-[46rem] text-left text-sm">
+                    <thead className="sticky top-0 z-10 border-b border-border bg-surface-subtle text-xs text-muted-foreground">
+                      <tr>
+                        <th scope="col" className="px-3 py-2 font-medium">Reference</th>
+                        <th scope="col" className="px-3 py-2 font-medium">Subscriber</th>
+                        <th scope="col" className="px-3 py-2 font-medium">Phone</th>
+                        <th scope="col" className="px-3 py-2 font-medium">Method</th>
+                        <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+                        <th scope="col" className="px-3 py-2 font-medium">Status</th>
+                        <th scope="col" className="px-3 py-2 font-medium">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                      {rows.map((pay) => (
+                        <tr key={pay.id} className="hover:bg-surface-subtle">
+                          <td className="px-3 py-2 font-mono text-xs font-medium">{pay.transactionReference}</td>
+                          <td className="px-3 py-2">
+                            <div className="leading-5">{pay.customerName || pay.senderName || "Unmatched"}</div>
+                            <div className="font-mono text-xs text-muted-foreground">{pay.accountNumber || "No account"}</div>
+                          </td>
+                          <td className="tabular px-3 py-2">{pay.msisdnPhone}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{METHOD_LABEL[pay.paymentMethod] ?? pay.paymentMethod}</td>
+                          <td className="tabular px-3 py-2 text-right font-medium">{formatKES(pay.amount)}</td>
+                          <td className="px-3 py-2"><StatusBadge status={pay.status} /></td>
+                          <td className="px-3 py-2 text-muted-foreground">{formatShortDate(pay.processedAt ?? pay.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                  <span className="tabular">
+                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      aria-label="Previous page"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="tabular px-2">{page} / {pageCount}</span>
+                    <button
+                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                      disabled={page === pageCount}
+                      aria-label="Next page"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-surface-elevated disabled:opacity-40"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        </>
+      )}
 
       {isStkModalOpen && (
         <StkDialog

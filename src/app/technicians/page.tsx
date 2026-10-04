@@ -19,6 +19,7 @@ import { WorkOrder, WorkOrderStatus } from "@/types";
 import { formatShortDate } from "@/lib/utils";
 import { GlassCard, GlassCardHeader, GlassCardContent } from "@/components/ui/GlassCard";
 import { GlassBadge } from "@/components/ui/GlassBadge";
+import { FieldInventoryAndSlaPanels } from "@/components/technicians/FieldInventoryAndSlaPanels";
 
 export default function TechniciansPage() {
   const [orders, setOrders] = useState<WorkOrder[]>(SEED_WORK_ORDERS);
@@ -163,6 +164,8 @@ export default function TechniciansPage() {
           </GlassCard>
         ))}
       </div>
+
+      <FieldInventoryAndSlaPanels />
 
       {/* New Work Order Modal */}
       {isModalOpen && (

@@ -13,12 +13,14 @@ import {
   Moon,
   LogOut,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { ALL_NAV_ITEMS } from "./nav";
 import { useAuth } from "@/lib/auth/auth-context";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
+import { AiOperationsCopilotDrawer } from "@/components/copilot/AiOperationsCopilotDrawer";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Administrator",
@@ -402,6 +404,7 @@ function UserProfileMenu() {
 
 export function Navbar({ title = "Dashboard" }: { title?: string }) {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
+  const [isCopilotOpen, setCopilotOpen] = useState(false);
   const { isDemoMode } = useAuth();
 
   return (
@@ -426,10 +429,25 @@ export function Navbar({ title = "Dashboard" }: { title?: string }) {
           )}
         </div>
 
-        <UserProfileMenu />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCopilotOpen(true)}
+            aria-label="Open AI ISP Operations Copilot"
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-surface-elevated"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            <span className="hidden sm:inline">AI Copilot</span>
+          </button>
+          <UserProfileMenu />
+        </div>
       </header>
 
       <QuickJumpPalette />
+      <AiOperationsCopilotDrawer
+        open={isCopilotOpen}
+        onClose={() => setCopilotOpen(false)}
+      />
 
       {/* Tablet drawer (phones use the bottom bar instead; desktop has the persistent sidebar) */}
       {isDrawerOpen && (

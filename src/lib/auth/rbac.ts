@@ -1,4 +1,4 @@
-import { UserRole } from "@/types";
+import type { UserRole } from "../../types";
 
 export type Permission =
   | "org.manage"
@@ -15,58 +15,61 @@ export type Permission =
   | "billing.view"
   | "billing.reconcile"
   | "billing.refund"
+  | "ledger.view"
+  | "ledger.post"
+  | "approvals.request"
+  | "approvals.decide"
   | "vouchers.view"
   | "vouchers.generate"
   | "work_orders.view"
   | "work_orders.update"
   | "noc.view"
+  | "olt.manage"
+  | "inventory.manage"
+  | "gis.manage"
+  | "automation.manage"
+  | "soc.view"
+  | "audit.view"
+  | "copilot.use"
   | "portal.access";
 
+const ALL_STAFF_PERMISSIONS: Permission[] = [
+  "org.manage",
+  "users.manage",
+  "routers.view",
+  "routers.manage",
+  "routers.provision",
+  "customers.view",
+  "customers.create",
+  "customers.update",
+  "customers.suspend",
+  "plans.view",
+  "plans.modify",
+  "billing.view",
+  "billing.reconcile",
+  "billing.refund",
+  "ledger.view",
+  "ledger.post",
+  "approvals.request",
+  "approvals.decide",
+  "vouchers.view",
+  "vouchers.generate",
+  "work_orders.view",
+  "work_orders.update",
+  "noc.view",
+  "olt.manage",
+  "inventory.manage",
+  "gis.manage",
+  "automation.manage",
+  "soc.view",
+  "audit.view",
+  "copilot.use",
+  "portal.access",
+];
+
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  super_admin: [
-    "org.manage",
-    "users.manage",
-    "routers.view",
-    "routers.manage",
-    "routers.provision",
-    "customers.view",
-    "customers.create",
-    "customers.update",
-    "customers.suspend",
-    "plans.view",
-    "plans.modify",
-    "billing.view",
-    "billing.reconcile",
-    "billing.refund",
-    "vouchers.view",
-    "vouchers.generate",
-    "work_orders.view",
-    "work_orders.update",
-    "noc.view",
-    "portal.access",
-  ],
-  isp_owner: [
-    "org.manage",
-    "users.manage",
-    "routers.view",
-    "routers.manage",
-    "routers.provision",
-    "customers.view",
-    "customers.create",
-    "customers.update",
-    "customers.suspend",
-    "plans.view",
-    "plans.modify",
-    "billing.view",
-    "billing.reconcile",
-    "billing.refund",
-    "vouchers.view",
-    "vouchers.generate",
-    "work_orders.view",
-    "work_orders.update",
-    "noc.view",
-    "portal.access",
-  ],
+  super_admin: ALL_STAFF_PERMISSIONS,
+  isp_owner: ALL_STAFF_PERMISSIONS,
   isp_admin: [
     "users.manage",
     "routers.view",
@@ -77,22 +80,56 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "customers.update",
     "customers.suspend",
     "plans.view",
+    "plans.modify",
     "billing.view",
     "billing.reconcile",
+    "ledger.view",
+    "ledger.post",
+    "approvals.request",
+    "approvals.decide",
     "vouchers.view",
     "vouchers.generate",
     "work_orders.view",
     "work_orders.update",
     "noc.view",
+    "olt.manage",
+    "inventory.manage",
+    "gis.manage",
+    "automation.manage",
+    "soc.view",
+    "audit.view",
+    "copilot.use",
+  ],
+  noc_engineer: [
+    "routers.view",
+    "routers.manage",
+    "routers.provision",
+    "customers.view",
+    "customers.suspend",
+    "plans.view",
+    "work_orders.view",
+    "work_orders.update",
+    "noc.view",
+    "olt.manage",
+    "gis.manage",
+    "automation.manage",
+    "soc.view",
+    "copilot.use",
   ],
   finance: [
     "customers.view",
     "billing.view",
     "billing.reconcile",
     "billing.refund",
+    "ledger.view",
+    "ledger.post",
+    "approvals.request",
+    "approvals.decide",
     "plans.view",
     "vouchers.view",
     "noc.view",
+    "audit.view",
+    "copilot.use",
   ],
   support: [
     "customers.view",
@@ -101,9 +138,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "routers.view",
     "plans.view",
     "billing.view",
+    "approvals.request",
     "vouchers.view",
     "work_orders.view",
+    "work_orders.update",
     "noc.view",
+    "copilot.use",
   ],
   technician: [
     "customers.view",
@@ -111,6 +151,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "work_orders.view",
     "work_orders.update",
     "noc.view",
+    "olt.manage",
+    "inventory.manage",
+    "gis.manage",
+    "copilot.use",
   ],
   agent: [
     "customers.view",
@@ -119,6 +163,26 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "vouchers.view",
     "vouchers.generate",
     "billing.view",
+  ],
+  reseller: [
+    "customers.view",
+    "customers.create",
+    "plans.view",
+    "vouchers.view",
+    "vouchers.generate",
+    "billing.view",
+  ],
+  auditor: [
+    "routers.view",
+    "customers.view",
+    "plans.view",
+    "billing.view",
+    "ledger.view",
+    "vouchers.view",
+    "work_orders.view",
+    "noc.view",
+    "soc.view",
+    "audit.view",
   ],
   customer: [
     "portal.access",
@@ -133,4 +197,8 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 
 export function canManageTenant(role: UserRole): boolean {
   return role === "super_admin" || role === "isp_owner";
+}
+
+export function listRolePermissions(role: UserRole): Permission[] {
+  return [...(ROLE_PERMISSIONS[role] || [])];
 }

@@ -10,6 +10,7 @@ import { cn, formatShortDate } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
+import { TopologyAndAutomationPanels } from "@/components/monitoring/TopologyAndAutomationPanels";
 
 const SEVERITY_TONE: Record<NetworkAlert["severity"], string> = {
   CRITICAL: "bg-danger",
@@ -56,7 +57,7 @@ export default function MonitoringPage() {
     <AppShell title="Monitoring">
       <PageHeader
         title="Monitoring"
-        description="Open network alerts and interface traffic."
+        description="Open network alerts, topology blast-radius correlation, and interface traffic."
         actions={
           isDemoMode ? (
             <span className="rounded-md border border-warning/30 bg-warning-soft px-2 py-1 text-xs font-medium text-warning">
@@ -144,6 +145,8 @@ export default function MonitoringPage() {
           </div>
         )}
       </section>
+
+      <TopologyAndAutomationPanels />
     </AppShell>
   );
 }

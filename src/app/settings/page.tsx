@@ -41,6 +41,7 @@ import {
 } from "@/lib/preferences";
 import { cn, formatShortDate } from "@/lib/utils";
 import type { OrganizationRow } from "@/types/database.types";
+import { SocAndGovernancePanels } from "@/components/settings/SocAndGovernancePanels";
 
 interface SettingsFormState {
   name: string;
@@ -859,6 +860,8 @@ export default function SettingsPage() {
           </section>
         </div>
       </div>
+
+      <SocAndGovernancePanels />
 
       {/* Confirmation Modal for Currency / Billing Policy Changes */}
       {confirmModalOpen && baselineForm && (

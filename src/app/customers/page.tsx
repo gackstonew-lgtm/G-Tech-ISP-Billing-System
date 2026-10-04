@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { PageHeader, btnClass } from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/ui/States";
 import { usePageSize } from "@/lib/preferences";
+import { Customer360Drawer } from "@/components/customers/Customer360Drawer";
 
 type SortKey = "name" | "balance" | "expiry";
 
@@ -40,6 +41,7 @@ export default function CustomersPage() {
   const [PAGE_SIZE] = usePageSize();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selected360Customer, setSelected360Customer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -319,7 +321,13 @@ export default function CustomersPage() {
                   {pageRows.map((cust) => (
                     <tr key={cust.id} className="hover:bg-surface-subtle">
                       <td className="px-3 py-2">
-                        <div className="font-medium leading-5">{cust.fullName}</div>
+                        <button
+                          type="button"
+                          onClick={() => setSelected360Customer(cust)}
+                          className="text-left font-medium leading-5 text-foreground hover:text-primary hover:underline"
+                        >
+                          {cust.fullName}
+                        </button>
                         <div className="font-mono text-xs text-muted-foreground">{cust.accountNumber}</div>
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
@@ -345,27 +353,36 @@ export default function CustomersPage() {
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{cust.siteName || "—"}</td>
                       <td className="px-3 py-2 text-right">
-                        <button
-                          onClick={() => handleToggleSuspend(cust.id)}
-                          className={cn(
-                            "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors",
-                            cust.status === "ACTIVE"
-                              ? "border-danger/30 text-danger hover:bg-danger-soft"
-                              : "border-success/30 text-success hover:bg-success-soft"
-                          )}
-                        >
-                          {cust.status === "ACTIVE" ? (
-                            <>
-                              <PauseCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                              Suspend
-                            </>
-                          ) : (
-                            <>
-                              <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                              Reactivate
-                            </>
-                          )}
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelected360Customer(cust)}
+                            className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-surface px-2 text-xs font-medium text-foreground transition-colors hover:bg-surface-elevated"
+                          >
+                            360° View
+                          </button>
+                          <button
+                            onClick={() => handleToggleSuspend(cust.id)}
+                            className={cn(
+                              "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition-colors",
+                              cust.status === "ACTIVE"
+                                ? "border-danger/30 text-danger hover:bg-danger-soft"
+                                : "border-success/30 text-success hover:bg-success-soft"
+                            )}
+                          >
+                            {cust.status === "ACTIVE" ? (
+                              <>
+                                <PauseCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                                Suspend
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                                Reactivate
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -403,6 +420,19 @@ export default function CustomersPage() {
           </>
         )}
       </section>
+
+      <Customer360Drawer
+        customer={selected360Customer}
+        onClose={() => setSelected360Customer(null)}
+        onToggleSuspend={(id) => {
+          handleToggleSuspend(id);
+          setSelected360Customer((prev) =>
+            prev && prev.id === id
+              ? { ...prev, status: prev.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE" }
+              : prev
+          );
+        }}
+      />
 
       {isAddModalOpen && (
         <AddSubscriberDialog
