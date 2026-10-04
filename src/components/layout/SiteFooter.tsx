@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
-  Globe,
   Mail,
   MessageCircle,
   ShieldCheck,
@@ -15,7 +14,6 @@ import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
 import {
   LEGAL_CONTACT,
   LEGAL_DOCUMENT_LIST,
-  SUPPORTED_COUNTRIES,
 } from "@/lib/legal/documents";
 
 interface FooterLinkItem {
@@ -240,30 +238,6 @@ export function SiteFooter({ onEnterDemo }: SiteFooterProps) {
               </div>
             );
           })}
-        </div>
-
-        {/* SUPPORTED COUNTRIES SECTION */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-surface border border-border space-y-3.5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-foreground">
-              <Globe className="w-4 h-4 text-primary shrink-0" />
-              <span>Countries Supported by the QC NetCore Platform Architecture</span>
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              Multi-currency billing, RADIUS AAA &amp; MikroTik provisioning support across 22 markets
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {SUPPORTED_COUNTRIES.map((country) => (
-              <span
-                key={country}
-                className="inline-flex items-center px-2.5 py-1 rounded-lg bg-surface-subtle border border-border/80 text-[11px] font-medium text-foreground/90"
-              >
-                {country}
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* LEGAL & COMPLIANCE LINKS BAR */}

@@ -137,6 +137,12 @@ test("SiteFooter implements all 6 navigation columns, countries section, and leg
     !footerSrc.includes('href: "#"') && !footerSrc.includes('href="#"'),
     "SiteFooter must not contain dead '#' links"
   );
+
+  // Ensure Supported Countries block is removed from SiteFooter
+  assert.ok(
+    !footerSrc.includes("Countries Supported by the QC NetCore Platform Architecture"),
+    "SiteFooter must not display the Supported Countries block"
+  );
 });
 
 test("Landing page, Legal routes, Contact page, and CookieConsentBanner are properly wired", () => {
