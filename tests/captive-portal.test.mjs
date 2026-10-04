@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AUTH_METHOD_REGISTRY,
+  DEFAULT_DEMO_HOTSPOT_PLANS,
   PORTAL_TEMPLATES,
   applyTemplate,
   buildAssetPrefix,
@@ -9,6 +10,7 @@ import {
   contrastRatio,
   detectImageType,
   ensureContrast,
+  getDefaultDemoPortalConfig,
   getDefaultPortalConfig,
   getPortalWarnings,
   isOrgAssetUrl,
@@ -181,3 +183,36 @@ test("Text/URL primitives", () => {
   assert.equal(isSafeHttpsUrl("javascript:alert(1)"), false);
   assert.equal(isSafeHttpsUrl("https://user:pw@example.com"), false);
 });
+
+test("Demo captive portal — includes Daily Basic, Weekly Plus, and Monthly Pro packages with badges", () => {
+  const demoCfg = getDefaultDemoPortalConfig("QC NetCore");
+  const validIds = DEFAULT_DEMO_HOTSPOT_PLANS.map((p) => p.id);
+  const sanitized = sanitizePortalConfig(demoCfg, optsFor(prefixA, validIds));
+  assert.deepEqual(sanitized.errors, {});
+
+  const presented = presentPackages(DEFAULT_DEMO_HOTSPOT_PLANS, sanitized.config);
+  const daily = presented.find((p) => p.name === "Daily Basic");
+  const weekly = presented.find((p) => p.name === "Weekly Plus");
+  const monthly = presented.find((p) => p.name === "Monthly Pro");
+
+  assert.ok(daily, "Daily Basic package present");
+  assert.equal(daily.price, 50);
+  assert.equal(daily.speedLabel, "5 Mbps");
+  assert.equal(daily.durationLabel, "1 Day");
+  assert.equal(daily.dataLabel, "Unlimited");
+
+  assert.ok(weekly, "Weekly Plus package present");
+  assert.equal(weekly.price, 250);
+  assert.equal(weekly.speedLabel, "10 Mbps");
+  assert.equal(weekly.durationLabel, "7 Days");
+  assert.equal(weekly.dataLabel, "Unlimited");
+  assert.equal(weekly.badge, "Popular");
+
+  assert.ok(monthly, "Monthly Pro package present");
+  assert.equal(monthly.price, 800);
+  assert.equal(monthly.speedLabel, "20 Mbps");
+  assert.equal(monthly.durationLabel, "30 Days");
+  assert.equal(monthly.dataLabel, "Unlimited");
+  assert.equal(monthly.badge, "Best Value");
+});
+

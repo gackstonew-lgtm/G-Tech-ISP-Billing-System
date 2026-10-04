@@ -64,6 +64,7 @@ export interface PackageOverride {
   hidden?: boolean;
   cta?: string;
   description?: string;
+  badge?: string;
 }
 
 export interface PortalMessages {
@@ -876,6 +877,7 @@ export function sanitizePortalConfig(input: unknown, opts: SanitizeOptions): San
       if (typeof raw.hidden === "boolean") ov.hidden = raw.hidden;
       if (typeof raw.cta === "string") ov.cta = cleanText(raw.cta, 30);
       if (typeof raw.description === "string") ov.description = cleanText(raw.description, 120);
+      if (typeof raw.badge === "string") ov.badge = cleanText(raw.badge, 24);
       cfg.packages.overrides[planId] = ov;
     }
   }
@@ -949,7 +951,126 @@ export interface PresentedPackage {
   dataLabel: string;
   description: string;
   featured: boolean;
+  badge?: string;
   cta: string;
+}
+
+export const DEFAULT_DEMO_HOTSPOT_PLANS: PlanLike[] = [
+  {
+    id: "plan-hs-24h",
+    name: "Hotspot Daily Basic",
+    price: 50,
+    currency: "KES",
+    downloadSpeedKbps: 5120,
+    validityDurationSeconds: 86400,
+    dataLimitMb: 0,
+  },
+  {
+    id: "plan-hs-7d",
+    name: "Hotspot Weekly Plus",
+    price: 250,
+    currency: "KES",
+    downloadSpeedKbps: 10240,
+    validityDurationSeconds: 604800,
+    dataLimitMb: 0,
+  },
+  {
+    id: "plan-hs-30d",
+    name: "Hotspot Monthly Pro",
+    price: 800,
+    currency: "KES",
+    downloadSpeedKbps: 20480,
+    validityDurationSeconds: 2592000,
+    dataLimitMb: 0,
+  },
+  {
+    id: "plan-hs-1h",
+    name: "Hotspot 1 Hour Express",
+    price: 10,
+    currency: "KES",
+    downloadSpeedKbps: 3072,
+    validityDurationSeconds: 3600,
+    dataLimitMb: 0,
+  },
+  {
+    id: "plan-hs-3h",
+    name: "Hotspot 3 Hours Special",
+    price: 20,
+    currency: "KES",
+    downloadSpeedKbps: 4096,
+    validityDurationSeconds: 10800,
+    dataLimitMb: 0,
+  },
+];
+
+export function getDefaultDemoPortalConfig(businessName = "QC NetCore"): PortalConfig {
+  const base = getDefaultPortalConfig(businessName);
+  return {
+    ...base,
+    branding: {
+      ...base.branding,
+      businessName,
+      headline: "Connect to High-Speed WiFi",
+      welcomeMessage: "Choose a package to pay instantly with M-Pesa, or enter your voucher code.",
+      footerText: "Powered by QC NetCore • 24/7 Customer Support",
+    },
+    packages: {
+      ...base.packages,
+      layout: "grid",
+      defaultCta: "Select Package",
+      overrides: {
+        "plan-hs-24h": {
+          featured: false,
+          description: "Everyday browsing, social media & messaging",
+          cta: "Select Daily",
+        },
+        "plan-hs-7d": {
+          featured: true,
+          badge: "Popular",
+          description: "HD streaming, video calls & remote work",
+          cta: "Select Weekly",
+        },
+        "plan-hs-30d": {
+          featured: false,
+          badge: "Best Value",
+          description: "High-speed multi-device access all month",
+          cta: "Select Monthly",
+        },
+        "plan-hs-1h": {
+          featured: false,
+          description: "Quick 1-hour pass for instant access",
+          cta: "Quick Pass",
+        },
+        "plan-hs-3h": {
+          featured: false,
+          hidden: true,
+          description: "3-hour pass for study and meetings",
+          cta: "Select 3 Hours",
+        },
+      },
+    },
+    content: {
+      ...base.content,
+      supportMessage: "Need help connecting? Contact 24/7 WiFi Support.",
+      phone: "+254712345678",
+      whatsapp: "+254712345678",
+      email: "support@nexanet.co.ke",
+      location: "Nairobi Metro Hotspot Network",
+      terms:
+        "Packages activate immediately upon M-Pesa confirmation or voucher validation. Fair usage policy applies for uninterrupted network quality.",
+      privacy:
+        "Your phone number and device MAC address are used solely for M-Pesa payment verification and FreeRADIUS session provisioning.",
+    },
+    promotions: {
+      ...base.promotions,
+      banner: {
+        enabled: true,
+        text: "Instant M-Pesa STK activation — connect in under 5 seconds",
+        ctaText: "",
+        ctaUrl: "",
+      },
+    },
+  };
 }
 
 export function formatDurationLabel(seconds: number): string {
@@ -978,6 +1099,7 @@ export function presentPackages(plans: PlanLike[], cfg: PortalConfig): Presented
     .filter((p) => !cfg.packages.overrides[p.id]?.hidden)
     .map((p) => {
       const ov = cfg.packages.overrides[p.id] ?? {};
+      const badge = ov.badge || (ov.featured ? "Popular" : undefined);
       return {
         id: p.id,
         name: p.name.replace(/^Hotspot\s+/i, ""),
@@ -988,6 +1110,7 @@ export function presentPackages(plans: PlanLike[], cfg: PortalConfig): Presented
         dataLabel: formatDataLabel(p.dataLimitMb),
         description: ov.description ?? "",
         featured: Boolean(ov.featured),
+        ...(badge ? { badge } : {}),
         cta: ov.cta || cfg.packages.defaultCta,
       };
     })

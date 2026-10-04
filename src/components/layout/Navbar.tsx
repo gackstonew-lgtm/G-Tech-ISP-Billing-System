@@ -423,8 +423,8 @@ export function Navbar({ title = "Dashboard" }: { title?: string }) {
             {title}
           </h1>
           {isDemoMode && (
-            <span className="shrink-0 rounded-md border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning">
-              Demo data
+            <span className="shrink-0 rounded-md border border-primary/30 bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">
+              Interactive Demo
             </span>
           )}
         </div>

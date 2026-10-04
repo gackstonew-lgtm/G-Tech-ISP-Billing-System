@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SEED_ORGANIZATION, SEED_PLANS } from "@/lib/db/mock-db";
+import { SEED_ORGANIZATION } from "@/lib/db/mock-db";
 import {
+  DEFAULT_DEMO_HOTSPOT_PLANS,
+  getDefaultDemoPortalConfig,
   getDefaultPortalConfig,
   sanitizePortalConfig,
   AUTH_METHOD_REGISTRY,
@@ -32,28 +34,43 @@ function parseStored(row: PortalConfigRow | undefined, orgId: string, name: stri
   }).config;
 }
 
+function buildDemoConfigResponse(demoPlans: PlanLike[]) {
+  const def = getDefaultDemoPortalConfig(SEED_ORGANIZATION.name);
+  return NextResponse.json({
+    success: true,
+    data: {
+      isDemo: true,
+      canEdit: true,
+      organization: { name: SEED_ORGANIZATION.name, slug: SEED_ORGANIZATION.slug },
+      draft: def,
+      published: def,
+      versions: [
+        {
+          id: "demo-ver-1",
+          version: 1,
+          status: "PUBLISHED",
+          createdAt: new Date().toISOString(),
+          publishedAt: new Date().toISOString(),
+        },
+      ],
+      plans: demoPlans,
+      methods: AUTH_METHOD_REGISTRY,
+    },
+  });
+}
+
 // GET — draft + published + version history for the caller's OWN organization.
 export async function GET() {
-  const demoPlans: PlanLike[] = SEED_PLANS.filter((p) => p.serviceType === "HOTSPOT");
+  const demoPlans: PlanLike[] = DEFAULT_DEMO_HOTSPOT_PLANS;
   if ((await isDemoRequest()) || !SUPABASE_READY) {
-    const def = getDefaultPortalConfig(SEED_ORGANIZATION.name);
-    return NextResponse.json({
-      success: true,
-      data: {
-        isDemo: true,
-        canEdit: false,
-        organization: { name: SEED_ORGANIZATION.name, slug: SEED_ORGANIZATION.slug },
-        draft: def,
-        published: def,
-        versions: [],
-        plans: demoPlans,
-        methods: AUTH_METHOD_REGISTRY,
-      },
-    });
+    return buildDemoConfigResponse(demoPlans);
   }
 
   const auth = await authorizePortalAdmin();
-  if (!auth.ok) return auth.response;
+  if (!auth.ok) {
+    // Allow interactive Demo Mode preview & customization when not signed into a live tenant
+    return buildDemoConfigResponse(demoPlans);
+  }
   const { supabase, orgId } = auth.ctx;
 
   try {

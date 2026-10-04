@@ -88,10 +88,10 @@ export default function VouchersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight">
-            Hotspot Voucher Engine
+            Hotspot Vouchers
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Generate cryptographically unique access tokens, format thermal receipts, and print A4 cards
+            Generate batch voucher codes and print POS receipts or A4 cards.
           </p>
         </div>
         <div className="flex items-center gap-2.5">

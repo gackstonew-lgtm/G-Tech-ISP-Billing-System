@@ -15,6 +15,10 @@ import {
   Info,
   Star,
   X,
+  Wifi,
+  UserCheck,
+  Sparkles,
+  RotateCcw,
 } from "lucide-react";
 import {
   FONT_SCALE_FACTOR,
@@ -28,6 +32,7 @@ import {
   type PortalConfig,
   type PortalPalette,
 } from "@/lib/captive/config";
+import type { DemoPortalSettings } from "@/lib/captive/demo-state";
 
 /**
  * Reusable, template-driven captive portal renderer.
@@ -49,13 +54,26 @@ interface PortalRendererProps {
   mode: PortalMode;
   /** Which login methods the backend supports (public API supplies this). */
   supportedMethods?: string[];
+  /** Optional demo portal settings when running in Demo Mode or Customizer Preview. */
+  demoSettings?: DemoPortalSettings;
+  isDemo?: boolean;
   className?: string;
 }
 
-type Tab = "MPESA" | "VOUCHER";
+type Tab = "MPESA" | "VOUCHER" | "ACCOUNT" | "TRIAL";
 interface Status {
   kind: "success" | "error" | "info";
   text: string;
+}
+
+interface ActiveSessionInfo {
+  method: "MPESA" | "VOUCHER" | "ACCOUNT" | "TRIAL";
+  packageName: string;
+  speedLabel: string;
+  durationLabel: string;
+  dataLabel: string;
+  reference: string;
+  phoneOrUser: string;
 }
 
 function useElementWidth<T extends HTMLElement>() {
@@ -124,7 +142,15 @@ function buildBackground(config: PortalConfig, p: PortalPalette): React.CSSPrope
   return { backgroundColor: p.bg };
 }
 
-export function PortalRenderer({ config, plans, mode, supportedMethods, className }: PortalRendererProps) {
+export function PortalRenderer({
+  config,
+  plans,
+  mode,
+  supportedMethods,
+  demoSettings,
+  isDemo = false,
+  className,
+}: PortalRendererProps) {
   const { ref, width } = useElementWidth<HTMLDivElement>();
   const systemDark = useSystemDark(config.ui.colorMode === "auto");
   const pal = useMemo(() => resolvePalette(config, systemDark), [config, systemDark]);
@@ -137,47 +163,101 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
   const compact = width > 0 && width < 560;
   const wide = width >= 900;
 
-  const packages = useMemo(() => presentPackages(plans, config), [plans, config]);
+  const effectivePlans = useMemo(() => {
+    if (!demoSettings?.defaultCurrency) return plans;
+    return plans.map((p) => ({ ...p, currency: demoSettings.defaultCurrency }));
+  }, [plans, demoSettings?.defaultCurrency]);
+
+  const packages = useMemo(() => presentPackages(effectivePlans, config), [effectivePlans, config]);
 
   const methodAllowed = (id: string) => !supportedMethods || supportedMethods.includes(id);
-  const mpesaOn = config.authMethods.mpesa && methodAllowed("mpesa");
-  const voucherOn = config.authMethods.voucher && methodAllowed("voucher");
-  const bothOn = mpesaOn && voucherOn;
+  const mpesaOn =
+    (demoSettings ? demoSettings.mpesaExpressEnabled : config.authMethods.mpesa) &&
+    methodAllowed("mpesa");
+  const voucherOn =
+    (demoSettings ? demoSettings.voucherRedemptionEnabled : config.authMethods.voucher) &&
+    methodAllowed("voucher");
+  const accountOn = Boolean(demoSettings?.enableAccountLogin);
+  const trialOn = Boolean(demoSettings?.enableFreeTrial);
 
-  const [tab, setTab] = useState<Tab>(mpesaOn ? "MPESA" : "VOUCHER");
+  const availableTabs = useMemo(() => {
+    const list: [Tab, string][] = [];
+    if (mpesaOn) list.push(["MPESA", "Buy Package"]);
+    if (voucherOn) list.push(["VOUCHER", "Voucher"]);
+    if (accountOn) list.push(["ACCOUNT", "Account Login"]);
+    if (trialOn) list.push(["TRIAL", "Free Trial"]);
+    if (list.length === 0) list.push(["MPESA", "Buy Package"]);
+    return list;
+  }, [mpesaOn, voucherOn, accountOn, trialOn]);
+
+  const [tab, setTab] = useState<Tab>(availableTabs[0][0]);
   useEffect(() => {
-    if (tab === "MPESA" && !mpesaOn && voucherOn) setTab("VOUCHER");
-    if (tab === "VOUCHER" && !voucherOn && mpesaOn) setTab("MPESA");
-  }, [mpesaOn, voucherOn, tab]);
+    if (!availableTabs.some(([id]) => id === tab)) {
+      setTab(availableTabs[0][0]);
+    }
+  }, [availableTabs, tab]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = packages.find((p) => p.id === selectedId) ?? packages[0] ?? null;
+  const selected =
+    packages.find((p) => p.id === selectedId) ??
+    packages.find((p) => p.featured) ??
+    packages[0] ??
+    null;
 
   const [phone, setPhone] = useState("");
   const [voucher, setVoucher] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | null>(null);
+  const [activeSession, setActiveSession] = useState<ActiveSessionInfo | null>(null);
   const [legal, setLegal] = useState<"terms" | "privacy" | null>(null);
 
   const msgs = config.messages;
+  const isDemoOrPreview = mode === "preview" || isDemo;
 
-  // ----- actions (live: existing flows; preview: local only, no network) -----
+  // ----- actions (live: existing flows; preview/demo: interactive simulation) -----
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
-    if (!/^(?:\+?254|0)?[17]\d{8}$/.test(phone.replace(/[\s-]/g, ""))) {
-      setStatus({ kind: "error", text: "Enter a valid M-Pesa number, e.g. 0712345678." });
+    const cleanPhone = phone.replace(/[\s-]/g, "");
+    if (!/^(?:\+?254|0)?[17]\d{8}$/.test(cleanPhone)) {
+      setStatus({ kind: "error", text: "Enter a valid M-Pesa phone number, e.g. 0712345678." });
       return;
     }
     setBusy(true);
-    setStatus({ kind: "info", text: config.payment.instructions || "Check your phone for the M-Pesa prompt." });
-    if (mode === "preview") {
+    setStatus({
+      kind: "info",
+      text:
+        config.payment.instructions ||
+        `STK Push sent to ${cleanPhone}. Enter your M-Pesa PIN to complete ${formatMoney(selected.price, selected.currency)}.`,
+    });
+
+    const completeActivation = (refCode: string) => {
+      const confirmMsg =
+        demoSettings?.paymentConfirmationMessage ||
+        config.payment.confirmation ||
+        msgs.paymentSuccess;
+      setStatus({ kind: "success", text: confirmMsg });
+      setActiveSession({
+        method: "MPESA",
+        packageName: selected.name,
+        speedLabel: selected.speedLabel,
+        durationLabel: selected.durationLabel,
+        dataLabel: selected.dataLabel,
+        reference: refCode,
+        phoneOrUser: cleanPhone,
+      });
+      setBusy(false);
+    };
+
+    if (mode === "preview" || (isDemo && (demoSettings?.demoAutoApprovePayment ?? true))) {
       setTimeout(() => {
-        setStatus({ kind: "success", text: config.payment.confirmation || msgs.paymentSuccess });
-        setBusy(false);
-      }, 900);
+        completeActivation(`QCN${Math.floor(100000 + Math.random() * 900000)}`);
+      }, 950);
       return;
     }
+
     try {
       const { MpesaService } = await import("@/lib/payments/mpesa");
       const res = await MpesaService.initiateSTKPush({
@@ -188,9 +268,8 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
       });
       if (res.success) {
         setTimeout(() => {
-          setStatus({ kind: "success", text: config.payment.confirmation || msgs.paymentSuccess });
-          setBusy(false);
-        }, 2000);
+          completeActivation(res.checkoutRequestId?.slice(-8).toUpperCase() || "QCN849201");
+        }, 1600);
       } else {
         setStatus({ kind: "error", text: msgs.paymentFailed });
         setBusy(false);
@@ -203,17 +282,69 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
 
   const handleVoucher = (e: React.FormEvent) => {
     e.preventDefault();
-    const code = voucher.trim();
+    const code = voucher.trim().toUpperCase();
     if (!/^[A-Z0-9-]{6,24}$/.test(code)) {
       setStatus({ kind: "error", text: msgs.voucherInvalid });
       return;
     }
     setBusy(true);
-    setStatus({ kind: "info", text: "Checking your voucher…" });
+    setStatus({ kind: "info", text: "Validating voucher code with RADIUS server…" });
+    setTimeout(() => {
+      const successText = demoSettings?.voucherActivationMessage || msgs.loginSuccess;
+      setStatus({ kind: "success", text: successText });
+      setActiveSession({
+        method: "VOUCHER",
+        packageName: selected?.name || "Hotspot Voucher Pass",
+        speedLabel: selected?.speedLabel || "10 Mbps",
+        durationLabel: selected?.durationLabel || "24 Hours",
+        dataLabel: "Unlimited",
+        reference: code,
+        phoneOrUser: code,
+      });
+      setBusy(false);
+    }, 900);
+  };
+
+  const handleAccountLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setStatus({ kind: "error", text: "Enter your subscriber username and password." });
+      return;
+    }
+    setBusy(true);
+    setStatus({ kind: "info", text: "Authenticating subscriber credentials…" });
     setTimeout(() => {
       setStatus({ kind: "success", text: msgs.loginSuccess });
+      setActiveSession({
+        method: "ACCOUNT",
+        packageName: "Subscriber Hotspot Roaming",
+        speedLabel: "20 Mbps",
+        durationLabel: demoSettings?.sessionTimeoutDisplay || "30 Days",
+        dataLabel: "Unlimited",
+        reference: `SUB-${username.trim().toUpperCase()}`,
+        phoneOrUser: username.trim(),
+      });
       setBusy(false);
-    }, 1000);
+    }, 850);
+  };
+
+  const handleFreeTrial = () => {
+    setBusy(true);
+    const mins = demoSettings?.freeTrialMinutes || 15;
+    setStatus({ kind: "info", text: `Activating ${mins}-minute complimentary WiFi session…` });
+    setTimeout(() => {
+      setStatus({ kind: "success", text: `${mins}-minute Free Trial activated! You are now online.` });
+      setActiveSession({
+        method: "TRIAL",
+        packageName: `${mins}-Minute Free Trial`,
+        speedLabel: "5 Mbps",
+        durationLabel: `${mins} Mins`,
+        dataLabel: "500 MB",
+        reference: `TRIAL-${Math.floor(1000 + Math.random() * 9000)}`,
+        phoneOrUser: "Guest Device",
+      });
+      setBusy(false);
+    }, 750);
   };
 
   // ----- styles -----
@@ -282,12 +413,19 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
       style={{ maxHeight: compact ? 44 : 56, maxWidth: "70%", objectFit: "contain" }}
     />
   ) : (
-    <span style={{ fontSize: fs(20), fontWeight: 800, color: pal.text, letterSpacing: "-0.01em" }}>
+    <span style={{ fontSize: fs(20), fontWeight: 800, color: pal.text, letterSpacing: "-0.015em" }}>
       {config.branding.businessName}
     </span>
   );
 
   const { banner, announcement, featuredOffer, adImage, sponsored } = config.promotions;
+  const showBanner =
+    (demoSettings ? demoSettings.showPromotionalBanner : true) &&
+    banner.enabled &&
+    Boolean(banner.text);
+  const showSupport = demoSettings ? demoSettings.showSupportContact : true;
+  const showTerms = demoSettings ? demoSettings.showTermsAndConditions : true;
+
   const safeLink = (href: string, children: React.ReactNode, style?: React.CSSProperties) => (
     <a href={href} target="_blank" rel="noopener noreferrer sponsored" style={style}>
       {children}
@@ -318,10 +456,108 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
     </div>
   );
 
+  const connectedCard = activeSession && (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        padding: 16,
+        borderRadius: radius.control + 4,
+        background: mixColors(pal.surface, pal.success, 0.08),
+        border: `2px solid ${mixColors(pal.surface, pal.success, 0.45)}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 9999,
+            background: mixColors(pal.surface, pal.success, 0.2),
+            color: pal.success,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Wifi size={20} aria-hidden />
+        </div>
+        <div>
+          <div style={{ fontSize: fs(11), fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: pal.success }}>
+            Internet Access Activated
+          </div>
+          <div style={{ fontSize: fs(16), fontWeight: 800, color: pal.text }}>
+            {activeSession.packageName}
+          </div>
+        </div>
+      </div>
+
+      {message}
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 8,
+          padding: 12,
+          borderRadius: radius.control,
+          background: pal.surface,
+          border: `1px solid ${pal.border}`,
+          fontSize: fs(12),
+        }}
+      >
+        <div>
+          <span style={{ color: pal.muted, display: "block", fontSize: fs(10.5), fontWeight: 600 }}>Speed Limit</span>
+          <strong style={{ color: pal.text }}>{activeSession.speedLabel}</strong>
+        </div>
+        <div>
+          <span style={{ color: pal.muted, display: "block", fontSize: fs(10.5), fontWeight: 600 }}>Validity</span>
+          <strong style={{ color: pal.text }}>{activeSession.durationLabel}</strong>
+        </div>
+        <div>
+          <span style={{ color: pal.muted, display: "block", fontSize: fs(10.5), fontWeight: 600 }}>Data Allowance</span>
+          <strong style={{ color: pal.text }}>{activeSession.dataLabel}</strong>
+        </div>
+        <div>
+          <span style={{ color: pal.muted, display: "block", fontSize: fs(10.5), fontWeight: 600 }}>Session Reference</span>
+          <strong style={{ color: pal.text, fontFamily: "ui-monospace, monospace" }}>{activeSession.reference}</strong>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveSession(null);
+            setStatus(null);
+          }}
+          style={{
+            ...buttonStyle,
+            minHeight: 40,
+            fontSize: fs(12.5),
+            background: pal.surface,
+            color: pal.text,
+            border: `1px solid ${pal.border}`,
+          }}
+        >
+          <RotateCcw size={14} aria-hidden />
+          <span>Switch Package / Test Again</span>
+        </button>
+      </div>
+    </div>
+  );
+
   const mpesaForm = (
     <form onSubmit={handlePay} style={{ display: "flex", flexDirection: "column", gap: 14 }} noValidate>
       <div>
-        <span style={labelStyle} id={`${uid}-pk`}>1. Select a package</span>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ ...labelStyle, marginBottom: 0 }} id={`${uid}-pk`}>1. Choose a WiFi package</span>
+          <span style={{ fontSize: fs(11), color: pal.muted, fontWeight: 600 }}>Instant M-Pesa Activation</span>
+        </div>
         {packages.length === 0 ? (
           <p style={{ fontSize: fs(13), color: pal.muted }}>No packages are available right now.</p>
         ) : (
@@ -336,9 +572,11 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
           >
             {packages.map((p) => {
               const on = selected?.id === p.id;
+              const badgeLabel = p.badge || (p.featured ? "Popular" : "");
+              const isBestValue = badgeLabel.toLowerCase().includes("best");
               const meta = [
-                config.packages.showSpeed && p.speedLabel,
                 config.packages.showDuration && p.durationLabel,
+                config.packages.showSpeed && p.speedLabel,
                 config.packages.showData && p.dataLabel,
               ].filter(Boolean);
               return (
@@ -347,23 +585,27 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  onClick={() => setSelectedId(p.id)}
+                  onClick={() => {
+                    setSelectedId(p.id);
+                    setStatus(null);
+                  }}
                   style={{
                     textAlign: "left",
-                    padding: 12,
+                    padding: 13,
                     minHeight: 44,
                     cursor: "pointer",
                     fontFamily: "inherit",
                     color: pal.text,
-                    background: on ? mixColors(pal.surface, pal.primary, 0.1) : pal.surface,
-                    border: `2px solid ${on ? pal.primary : pal.border}`,
+                    background: on ? mixColors(pal.surface, pal.primary, 0.11) : pal.surface,
+                    border: `2px solid ${on ? pal.primary : badgeLabel ? mixColors(pal.border, pal.primary, 0.45) : pal.border}`,
                     borderRadius: radius.control + 2,
                     position: "relative",
                     minWidth: 0,
                     overflowWrap: "anywhere",
+                    transition: "border-color 0.15s ease, background-color 0.15s ease",
                   }}
                 >
-                  {p.featured && (
+                  {badgeLabel && (
                     <span
                       style={{
                         position: "absolute",
@@ -376,27 +618,28 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
                         fontWeight: 800,
                         padding: "2px 8px",
                         borderRadius: 9999,
-                        background: pal.accent,
-                        color: pal.accentText,
+                        background: isBestValue ? pal.primary : pal.accent,
+                        color: isBestValue ? pal.primaryText : pal.accentText,
+                        letterSpacing: "0.02em",
                       }}
                     >
-                      <Star size={10} aria-hidden /> Featured
+                      <Star size={10} aria-hidden /> {badgeLabel}
                     </span>
                   )}
                   <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontSize: fs(13.5), fontWeight: 700 }}>{p.name}</span>
+                    <span style={{ fontSize: fs(14), fontWeight: 700 }}>{p.name}</span>
                     {on && <CheckCircle2 size={15} aria-hidden color={pal.primaryOnSurface} style={{ flexShrink: 0 }} />}
                   </span>
-                  <span style={{ display: "block", marginTop: 4, fontSize: fs(17), fontWeight: 800, color: pal.primaryOnSurface }}>
+                  <span className="tabular-nums" style={{ display: "block", marginTop: 4, fontSize: fs(18), fontWeight: 800, color: pal.primaryOnSurface }}>
                     {formatMoney(p.price, p.currency)}
                   </span>
                   {meta.length > 0 && (
-                    <span style={{ display: "block", marginTop: 2, fontSize: fs(11.5), color: pal.muted, fontWeight: 600 }}>
+                    <span style={{ display: "block", marginTop: 3, fontSize: fs(11.5), color: pal.text, fontWeight: 600, opacity: 0.9 }}>
                       {meta.join(" • ")}
                     </span>
                   )}
                   {p.description && (
-                    <span style={{ display: "block", marginTop: 4, fontSize: fs(11.5), color: pal.muted }}>{p.description}</span>
+                    <span style={{ display: "block", marginTop: 4, fontSize: fs(11.5), color: pal.muted, lineHeight: 1.35 }}>{p.description}</span>
                   )}
                 </button>
               );
@@ -405,8 +648,66 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
         )}
       </div>
 
+      {selected && (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: radius.control,
+            background: pal.surfaceAlt,
+            border: `1px solid ${pal.border}`,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <span style={{ fontSize: fs(10.5), fontWeight: 700, textTransform: "uppercase", color: pal.muted, display: "block" }}>
+              Selected Package
+            </span>
+            <span style={{ fontSize: fs(13), fontWeight: 700, color: pal.text }}>
+              {selected.name} ({selected.durationLabel} • {selected.speedLabel})
+            </span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span className="tabular-nums" style={{ fontSize: fs(15), fontWeight: 800, color: pal.primaryOnSurface }}>
+              {formatMoney(selected.price, selected.currency)}
+            </span>
+            {demoSettings?.paybillNumber && (
+              <span style={{ display: "block", fontSize: fs(10), color: pal.muted }}>
+                Paybill {demoSettings.paybillNumber}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div>
-        <label htmlFor={`${uid}-phone`} style={labelStyle}>2. M-Pesa phone number</label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <label htmlFor={`${uid}-phone`} style={{ ...labelStyle, marginBottom: 0 }}>2. M-Pesa phone number</label>
+          {isDemoOrPreview && phone !== "0712345678" && (
+            <button
+              type="button"
+              onClick={() => {
+                setPhone("0712345678");
+                setStatus(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: fs(11),
+                fontWeight: 700,
+                color: pal.primaryOnSurface,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Fill demo number
+            </button>
+          )}
+        </div>
         <div style={{ position: "relative" }}>
           <Phone size={16} aria-hidden color={pal.muted} style={{ position: "absolute", left: 12, top: 14 }} />
           <input
@@ -431,7 +732,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
       <button type="submit" disabled={busy || !selected} style={buttonStyle}>
         <Zap size={16} aria-hidden />
         <span>
-          {busy ? "Processing…" : selected ? `${selected.cta} · ${formatMoney(selected.price, selected.currency)}` : "Connect Now"}
+          {busy ? "Sending M-Pesa Prompt…" : selected ? `${selected.cta || "Pay & Connect"} · ${formatMoney(selected.price, selected.currency)}` : "Connect Now"}
         </span>
       </button>
     </form>
@@ -440,7 +741,30 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
   const voucherForm = (
     <form onSubmit={handleVoucher} style={{ display: "flex", flexDirection: "column", gap: 14 }} noValidate>
       <div>
-        <label htmlFor={`${uid}-voucher`} style={labelStyle}>Enter your voucher code</label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <label htmlFor={`${uid}-voucher`} style={{ ...labelStyle, marginBottom: 0 }}>Enter your voucher code</label>
+          {isDemoOrPreview && voucher !== "GT24-6629-XYZ" && (
+            <button
+              type="button"
+              onClick={() => {
+                setVoucher("GT24-6629-XYZ");
+                setStatus(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: fs(11),
+                fontWeight: 700,
+                color: pal.primaryOnSurface,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Fill demo voucher
+            </button>
+          )}
+        </div>
         <div style={{ position: "relative" }}>
           <Ticket size={16} aria-hidden color={pal.muted} style={{ position: "absolute", left: 12, top: 14 }} />
           <input
@@ -450,7 +774,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
             autoCapitalize="characters"
             spellCheck={false}
             required
-            placeholder="e.g. AB12-3456-CDE"
+            placeholder="e.g. GT24-6629-XYZ"
             value={voucher}
             onChange={(e) => setVoucher(e.target.value.toUpperCase())}
             style={{ ...inputStyle, paddingLeft: 36, letterSpacing: "0.06em", fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontWeight: 700 }}
@@ -459,19 +783,107 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
       </div>
       {message}
       <button type="submit" disabled={busy} style={buttonStyle}>
-        <span>{busy ? "Connecting…" : "Connect to Internet"}</span>
+        <span>{busy ? "Verifying Voucher…" : "Activate Voucher & Connect"}</span>
         <ArrowRight size={16} aria-hidden />
       </button>
     </form>
   );
 
-  const tabBar = bothOn && config.ui.formLayout === "tabs" && (
+  const accountForm = (
+    <form onSubmit={handleAccountLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }} noValidate>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <label htmlFor={`${uid}-user`} style={{ ...labelStyle, marginBottom: 0 }}>Subscriber Username</label>
+          {isDemoOrPreview && !username && (
+            <button
+              type="button"
+              onClick={() => {
+                setUsername("gt_john_kamau");
+                setPassword("Kamau#2025");
+                setStatus(null);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: fs(11),
+                fontWeight: 700,
+                color: pal.primaryOnSurface,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Fill demo account
+            </button>
+          )}
+        </div>
+        <input
+          id={`${uid}-user`}
+          type="text"
+          autoComplete="username"
+          required
+          placeholder="e.g. gt_john_kamau"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+      <div>
+        <label htmlFor={`${uid}-pass`} style={labelStyle}>Password</label>
+        <input
+          id={`${uid}-pass`}
+          type="password"
+          autoComplete="current-password"
+          required
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+      {message}
+      <button type="submit" disabled={busy} style={buttonStyle}>
+        <UserCheck size={16} aria-hidden />
+        <span>{busy ? "Signing in…" : "Sign In to Hotspot"}</span>
+      </button>
+    </form>
+  );
+
+  const trialForm = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div
+        style={{
+          padding: 14,
+          borderRadius: radius.control,
+          background: pal.surfaceAlt,
+          border: `1px solid ${pal.border}`,
+          fontSize: fs(13),
+          color: pal.text,
+          lineHeight: 1.5,
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>
+          Complimentary {demoSettings?.freeTrialMinutes || 15}-Minute WiFi Trial
+        </div>
+        <div style={{ color: pal.muted, fontSize: fs(12) }}>
+          Test our high-speed hotspot before purchasing a package. Limited to one trial session per device MAC address.
+        </div>
+      </div>
+      {message}
+      <button type="button" onClick={handleFreeTrial} disabled={busy} style={buttonStyle}>
+        <Sparkles size={16} aria-hidden />
+        <span>{busy ? "Activating Trial…" : `Start ${demoSettings?.freeTrialMinutes || 15}-Minute Free Trial`}</span>
+      </button>
+    </div>
+  );
+
+  const tabBar = availableTabs.length > 1 && config.ui.formLayout === "tabs" && !activeSession && (
     <div
       role="tablist"
       aria-label="Login method"
       style={{
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
+        gridTemplateColumns: `repeat(${availableTabs.length}, minmax(0, 1fr))`,
         gap: 4,
         padding: 4,
         marginBottom: 16,
@@ -479,12 +891,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
         borderRadius: radius.control + 4,
       }}
     >
-      {(
-        [
-          ["MPESA", "Buy via M-Pesa"],
-          ["VOUCHER", "Use Voucher"],
-        ] as [Tab, string][]
-      ).map(([id, label]) => (
+      {availableTabs.map(([id, label]) => (
         <button
           key={id}
           role="tab"
@@ -495,9 +902,10 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
             setStatus(null);
           }}
           style={{
-            minHeight: 40,
+            minHeight: 38,
+            padding: "6px 8px",
             fontFamily: "inherit",
-            fontSize: fs(12.5),
+            fontSize: fs(12),
             fontWeight: 700,
             cursor: "pointer",
             borderRadius: radius.control,
@@ -521,33 +929,53 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
       {config.ui.logoPosition === "inside-card" && (
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>{logo}</div>
       )}
-      {tabBar}
-      {config.ui.formLayout === "tabs" || !bothOn ? (
-        <div role={bothOn ? "tabpanel" : undefined}>
-          {tab === "MPESA" && mpesaOn && mpesaForm}
-          {tab === "VOUCHER" && voucherOn && voucherForm}
-          {!mpesaOn && !voucherOn && (
-            <p style={{ fontSize: fs(13), color: pal.muted }}>No login method is available. Please contact support.</p>
-          )}
-        </div>
+      {activeSession ? (
+        connectedCard
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {mpesaOn && (
-            <section aria-label="Buy via M-Pesa">
-              {sectionTitle("Buy a package with M-Pesa")}
-              {mpesaForm}
-            </section>
+        <>
+          {tabBar}
+          {config.ui.formLayout === "tabs" || availableTabs.length <= 1 ? (
+            <div role={availableTabs.length > 1 ? "tabpanel" : undefined}>
+              {tab === "MPESA" && mpesaOn && mpesaForm}
+              {tab === "VOUCHER" && voucherOn && voucherForm}
+              {tab === "ACCOUNT" && accountOn && accountForm}
+              {tab === "TRIAL" && trialOn && trialForm}
+              {!mpesaOn && !voucherOn && !accountOn && !trialOn && (
+                <p style={{ fontSize: fs(13), color: pal.muted }}>No login method is available. Please contact support.</p>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              {mpesaOn && (
+                <section aria-label="Buy via M-Pesa">
+                  {sectionTitle("Buy a package with M-Pesa")}
+                  {mpesaForm}
+                </section>
+              )}
+              {mpesaOn && voucherOn && (
+                <div aria-hidden style={{ textAlign: "center", fontSize: fs(11), color: pal.muted, fontWeight: 700 }}>— OR —</div>
+              )}
+              {voucherOn && (
+                <section aria-label="Use a voucher">
+                  {sectionTitle("Have a voucher?")}
+                  {voucherForm}
+                </section>
+              )}
+              {accountOn && (
+                <section aria-label="Account login">
+                  {sectionTitle("Subscriber Login")}
+                  {accountForm}
+                </section>
+              )}
+              {trialOn && (
+                <section aria-label="Free trial">
+                  {sectionTitle("Free WiFi Trial")}
+                  {trialForm}
+                </section>
+              )}
+            </div>
           )}
-          {mpesaOn && voucherOn && (
-            <div aria-hidden style={{ textAlign: "center", fontSize: fs(11), color: pal.muted, fontWeight: 700 }}>— OR —</div>
-          )}
-          {voucherOn && (
-            <section aria-label="Use a voucher">
-              {sectionTitle("Have a voucher?")}
-              {voucherForm}
-            </section>
-          )}
-        </div>
+        </>
       )}
     </>
   );
@@ -669,7 +1097,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
 
   const linkStyle: React.CSSProperties = { color: pal.primaryOnSurface, fontWeight: 600, textDecoration: "underline", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", minHeight: 24 };
 
-  const supportBlock = (contactItems.length > 0 || c.supportMessage || socials.length > 0) && (
+  const supportBlock = showSupport && (contactItems.length > 0 || c.supportMessage || socials.length > 0) && (
     <div
       style={{
         maxWidth: 520, width: "100%", margin: "0 auto", padding: 14, borderRadius: radius.card, background: pal.surface,
@@ -712,7 +1140,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
     </div>
   );
 
-  const hasLegal = Boolean(c.terms || c.privacy);
+  const hasLegal = showTerms && Boolean(c.terms || c.privacy);
 
   return (
     <div
@@ -732,7 +1160,7 @@ export function PortalRenderer({ config, plans, mode, supportedMethods, classNam
         ...buildBackground(config, pal),
       }}
     >
-      {banner.enabled && banner.text && (
+      {showBanner && (
         <div
           role="note"
           style={{

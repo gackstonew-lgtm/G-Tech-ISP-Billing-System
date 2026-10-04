@@ -78,7 +78,7 @@ export default function TechniciansPage() {
             Field Operations &amp; Work Orders
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Dispatch technicians, manage optical power levels, drop fiber splicing, and ONU installations
+            Dispatch technicians, track installations, and monitor fiber repairs.
           </p>
         </div>
         <button

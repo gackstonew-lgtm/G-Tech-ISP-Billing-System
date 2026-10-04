@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SEED_ORGANIZATION, SEED_PLANS } from "@/lib/db/mock-db";
+import { SEED_ORGANIZATION } from "@/lib/db/mock-db";
 import {
+  DEFAULT_DEMO_HOTSPOT_PLANS,
+  getDefaultDemoPortalConfig,
   getDefaultPortalConfig,
   resolveTenantKey,
   sanitizePortalConfig,
@@ -10,6 +12,7 @@ import {
   PLAN_COLUMNS,
   SUPABASE_READY,
   assetValidatorFor,
+  isDemoRequest,
   jsonError,
   mapPlanRows,
   type AnyClient,
@@ -19,44 +22,47 @@ export const dynamic = "force-dynamic";
 
 const CACHE = { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" };
 
+function buildDemoPortalResponse() {
+  return NextResponse.json(
+    {
+      success: true,
+      data: {
+        isDemo: true,
+        organization: { name: SEED_ORGANIZATION.name, slug: SEED_ORGANIZATION.slug },
+        config: getDefaultDemoPortalConfig(SEED_ORGANIZATION.name),
+        plans: DEFAULT_DEMO_HOTSPOT_PLANS,
+        methods: AUTH_METHOD_REGISTRY.filter((m) => m.supported).map((m) => m.id),
+        published: true,
+      },
+    },
+    { headers: CACHE }
+  );
+}
+
 /**
  * PUBLIC captive-portal resolution (no login — hotspot clients are anonymous).
  *
  * Tenant resolution order:
  *   1. ?org=<organization slug>   (what the MikroTik hotspot login redirect carries)
  *   2. Host header matching a published custom domain  (future: wifi.exampleisp.co.ke)
- *
- * Returns ONLY the published, validated design + that tenant's active hotspot
- * packages. No ids of other tenants, no credentials, no drafts.
- * ?preview=draft is NOT handled here — drafts are served only by the
- * authenticated /api/v1/captive/config route.
+ *   3. Interactive Demo fallback when accessed directly on platform host or with ?demo=true
  */
 export async function GET(req: NextRequest) {
+  const isExplicitDemo =
+    req.nextUrl.searchParams.get("demo") === "true" ||
+    req.nextUrl.searchParams.get("org") === SEED_ORGANIZATION.slug;
+
   const key = resolveTenantKey({
     org: req.nextUrl.searchParams.get("org"),
     host: req.headers.get("x-forwarded-host") ?? req.headers.get("host"),
     platformHosts: [process.env.NEXT_PUBLIC_APP_HOST ?? ""].filter(Boolean),
   });
 
-  // Local / unconfigured backend: serve the seeded demo tenant exactly as before.
-  if (!SUPABASE_READY) {
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          organization: { name: SEED_ORGANIZATION.name, slug: SEED_ORGANIZATION.slug },
-          config: getDefaultPortalConfig(SEED_ORGANIZATION.name),
-          plans: SEED_PLANS.filter((p) => p.serviceType === "HOTSPOT"),
-          methods: AUTH_METHOD_REGISTRY.filter((m) => m.supported).map((m) => m.id),
-          published: false,
-        },
-      },
-      { headers: CACHE }
-    );
-  }
-
-  if (!key) {
-    return jsonError(404, "PORTAL_NOT_FOUND", "This WiFi portal could not be found. Please scan the QR code or reconnect to the network.");
+  // Local / unconfigured backend or direct Demo Mode preview: serve the seeded demo tenant.
+  if (!SUPABASE_READY || !key || (await isDemoRequest())) {
+    if (!key || isExplicitDemo || !SUPABASE_READY) {
+      return buildDemoPortalResponse();
+    }
   }
 
   try {
@@ -94,6 +100,9 @@ export async function GET(req: NextRequest) {
     }
 
     if (!orgId) {
+      if (isExplicitDemo) {
+        return buildDemoPortalResponse();
+      }
       return jsonError(404, "PORTAL_NOT_FOUND", "This WiFi portal could not be found. Please scan the QR code or reconnect to the network.");
     }
 
@@ -113,19 +122,23 @@ export async function GET(req: NextRequest) {
         .order("price", { ascending: true }),
     ]);
 
-    const plans = mapPlanRows(planRows as Array<Record<string, unknown>> | null);
+    const dbPlans = mapPlanRows(planRows as Array<Record<string, unknown>> | null);
+    const plans = dbPlans.length > 0 ? dbPlans : isExplicitDemo ? DEFAULT_DEMO_HOTSPOT_PLANS : dbPlans;
     const config = pub
       ? sanitizePortalConfig((pub as { config: unknown }).config, {
           isAllowedAssetUrl: assetValidatorFor(orgId),
           validPlanIds: new Set(plans.map((p) => p.id)),
           businessNameFallback: orgName,
         }).config
-      : getDefaultPortalConfig(orgName);
+      : isExplicitDemo
+        ? getDefaultDemoPortalConfig(orgName)
+        : getDefaultPortalConfig(orgName);
 
     return NextResponse.json(
       {
         success: true,
         data: {
+          isDemo: isExplicitDemo && dbPlans.length === 0,
           organization: { name: orgName, slug: orgSlug },
           config,
           plans,
@@ -137,6 +150,9 @@ export async function GET(req: NextRequest) {
     );
   } catch (err) {
     console.error("[CaptivePortal] public resolve failed:", err);
+    if (isExplicitDemo) {
+      return buildDemoPortalResponse();
+    }
     return jsonError(503, "PORTAL_UNAVAILABLE", "The WiFi portal is temporarily unavailable. Please try again.");
   }
 }

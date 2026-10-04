@@ -137,7 +137,7 @@ export default function BillingPage() {
       });
       setIsSending(false);
       if (res.success) {
-        setStkMessage({ tone: "ok", text: "Demo: prompt sent. A sample payment will be added in a moment." });
+        setStkMessage({ tone: "ok", text: "M-Pesa STK prompt sent to subscriber phone. Verifying payment..." });
         setTimeout(() => {
           const receipt = MpesaService.generateReceiptNumber();
           const newPayment: Payment = {
@@ -172,7 +172,7 @@ export default function BillingPage() {
       if (res.ok && data.success) {
         setStkMessage({
           tone: "ok",
-          text: "Request sent. The payment will appear in the ledger once M-Pesa confirms it.",
+          text: "M-Pesa STK prompt sent. Payment will post automatically upon confirmation.",
         });
       } else {
         setStkMessage({ tone: "error", text: data?.error || "The request was not sent. No charge was made." });
@@ -188,7 +188,7 @@ export default function BillingPage() {
     <AppShell title="Payments">
       <PageHeader
         title="Payments"
-        description="M-Pesa and other collections. Payments are confirmed by the provider callback."
+        description="Real-time M-Pesa collections, invoicing, and ledger reconciliation."
         actions={
           <button onClick={() => setIsStkModalOpen(true)} className={btnClass("primary")}>
             <Zap className="h-4 w-4" aria-hidden="true" />

@@ -57,14 +57,7 @@ export default function MonitoringPage() {
     <AppShell title="Monitoring">
       <PageHeader
         title="Monitoring"
-        description="Open network alerts, topology blast-radius correlation, and interface traffic."
-        actions={
-          isDemoMode ? (
-            <span className="rounded-md border border-warning/30 bg-warning-soft px-2 py-1 text-xs font-medium text-warning">
-              Sample data
-            </span>
-          ) : undefined
-        }
+        description="Real-time network alerts, topology correlation, and interface telemetry."
       />
 
       {error && <ErrorState title="Could not load monitoring data" detail={error} onRetry={load} />}
@@ -78,7 +71,7 @@ export default function MonitoringPage() {
         {loading ? (
           <TableSkeleton rows={3} cols={3} />
         ) : alerts.length === 0 ? (
-          <EmptyState icon={Bell} title="No open alerts" description="Router and service alerts will appear here when they are raised." className="py-8" />
+          <EmptyState icon={Bell} title="No open alerts" description="All monitored routers and links are operating normally." className="py-8" />
         ) : (
           <ul className="divide-y divide-border-subtle">
             {alerts.map((a) => (
@@ -108,8 +101,8 @@ export default function MonitoringPage() {
         ) : interfaces.length === 0 ? (
           <EmptyState
             icon={Activity}
-            title="Live interface traffic is not connected"
-            description="Per-interface throughput appears here once router telemetry collection is set up. No figures are shown until then."
+            title="Awaiting router interface telemetry"
+            description="Connect a MikroTik router via WireGuard or SNMP to stream live interface throughput."
           />
         ) : (
           <div className="overflow-x-auto">

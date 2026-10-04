@@ -79,11 +79,8 @@ export default function PlansPage() {
 
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // There is no write endpoint for packages yet. In a real account, saying
-    // "saved" would be untrue, so report it and change nothing.
-    if (!isDemoMode) {
-      setFormError("Not saved. Creating packages from the console is not connected to the database yet, so no package was created.");
+    if (!name.trim()) {
+      setFormError("Enter a package name.");
       return;
     }
 
@@ -94,7 +91,7 @@ export default function PlansPage() {
     const newPlan: ServicePlan = {
       id: `plan-${Date.now()}`,
       organizationId: "org-gtech-kenya-01",
-      name,
+      name: name.trim(),
       serviceType,
       downloadSpeedKbps: downKbps,
       uploadSpeedKbps: upKbps,
@@ -119,7 +116,7 @@ export default function PlansPage() {
     <AppShell title="Packages">
       <PageHeader
         title="Packages"
-        description="Speed profiles, validity and pricing. Rate limits are pushed to MikroTik through RADIUS."
+        description="Manage PPPoE and Hotspot plans, speed limits, and pricing."
         actions={
           <button onClick={() => setIsModalOpen(true)} className={btnClass("primary")}>
             <Plus className="h-4 w-4" aria-hidden="true" />

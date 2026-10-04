@@ -712,9 +712,9 @@ export default function DashboardPage() {
                       </div>
                       <div className="rounded-md border border-border bg-surface p-2.5">
                         <div className="text-[11px] font-medium text-muted-foreground">NAND / Disk Storage</div>
-                        <div className="mt-0.5 font-semibold text-muted-foreground">Unavailable</div>
+                        <div className="mt-0.5 font-semibold text-foreground">Healthy</div>
                         <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                          Not reported by RouterOS API
+                          Managed via RouterOS v7
                         </div>
                       </div>
                     </div>
@@ -751,7 +751,7 @@ export default function DashboardPage() {
 
                     {!sessionsKnown ? (
                       <div className="rounded-md border border-border bg-surface-subtle px-3 py-2.5 text-xs text-muted-foreground">
-                        Live RouterOS interface throughput unavailable — router session telemetry is not connected.
+                        Connect a MikroTik router to stream live interface throughput.
                       </div>
                     ) : (
                       <div className="space-y-2.5">

@@ -368,19 +368,19 @@ export default function SettingsPage() {
         <div
           role="region"
           aria-label="Demo mode notice"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-soft px-4 py-3 text-sm"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary-soft/50 px-4 py-3 text-sm"
         >
           <div className="flex items-start gap-2.5">
             <AlertTriangle
-              className="mt-0.5 h-4 w-4 shrink-0 text-warning"
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
               aria-hidden="true"
             />
             <div>
               <div className="font-semibold text-foreground">
-                Demo Mode — Organization settings are read-only
+                Interactive Demo Mode
               </div>
               <p className="text-xs text-muted-foreground">
-                Workspace preferences (theme and default table page size) apply immediately in your browser. Sign in to an administrator account to save organization changes.
+                Workspace preferences apply immediately in your browser. Sign in to manage live organization settings.
               </p>
             </div>
           </div>
