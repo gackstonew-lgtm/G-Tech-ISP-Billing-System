@@ -3,12 +3,13 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, User, Building, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldCheck, Sun, Moon, Sparkles, User, Building, Phone, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useAuth } from "@/lib/auth/auth-context";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { classifyAuthError, sanitizeUserMessage } from "@/lib/supabase/errors";
 import { NexaNetLogo } from "@/components/ui/NexaNetLogo";
+import { validateAndNormalizePhone } from "@/lib/sms/phone";
 
 export default function SignInPage() {
   const [activeTab, setActiveTab] = useState<"SIGN_IN" | "REGISTER">("SIGN_IN");
@@ -21,6 +22,7 @@ export default function SignInPage() {
   // Register State
   const [fullName, setFullName] = useState("");
   const [organizationName, setOrganizationName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,6 +70,17 @@ export default function SignInPage() {
     setError(null);
     setSuccessMsg(null);
 
+    if (!fullName.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+
+    const phoneCheck = validateAndNormalizePhone(phoneNumber);
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || "Please enter a valid phone number (e.g. 0712052104 or +254712052104).");
+      return;
+    }
+
     if (regPassword !== confirmPassword) {
       setError("Passwords do not match. Please verify your password.");
       return;
@@ -78,6 +91,7 @@ export default function SignInPage() {
       return;
     }
 
+    if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
@@ -85,9 +99,10 @@ export default function SignInPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName,
-          organizationName,
-          email: regEmail,
+          fullName: fullName.trim(),
+          organizationName: organizationName.trim(),
+          phoneNumber: phoneCheck.normalizedPhoneNumber,
+          email: regEmail.trim(),
           password: regPassword,
         }),
       });
@@ -318,6 +333,25 @@ export default function SignInPage() {
                       value={organizationName}
                       onChange={(e) => setOrganizationName(e.target.value)}
                       placeholder="Organization name"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">
+                    Phone Number
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      required
+                      autoComplete="tel"
+                      inputMode="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="0712052104 or +254712052104"
                       className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-elevated border border-border text-sm text-foreground focus:outline-none focus:border-primary transition"
                     />
                   </div>

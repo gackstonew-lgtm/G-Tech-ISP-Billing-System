@@ -15,50 +15,49 @@ function slugify(text: string): string {
     .replace(/\-\-+/g, "-");
 }
 
+function validationError(field: string, message: string) {
+  return NextResponse.json(
+    { success: false, code: "VALIDATION_ERROR", field, message, error: message },
+    { status: 400 }
+  );
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { fullName, email, password, organizationName, phoneNumber, phone } = body;
-    const rawPhone = phoneNumber ?? phone ?? "";
-
-    if (!fullName || !email || !password || !rawPhone) {
-      return NextResponse.json(
-        {
-          success: false,
-          code: "VALIDATION_ERROR",
-          message: "Full name, phone number, email, and password are required.",
-          error: "Full name, phone number, email, and password are required.",
-        },
-        { status: 400 }
-      );
+    let body: Record<string, unknown>;
+    try {
+      body = (await req.json()) as Record<string, unknown>;
+    } catch {
+      return validationError("body", "Invalid request.");
     }
+    const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+    const fullName = str(body.fullName);
+    const email = str(body.email).toLowerCase();
+    const password = typeof body.password === "string" ? body.password : "";
+    const organizationName = str(body.organizationName);
+    const rawPhone = str(body.phoneNumber ?? body.phone);
+
+    if (!fullName) return validationError("fullName", "Full name is required.");
+    if (!rawPhone) return validationError("phoneNumber", "Phone number is required.");
+    if (!email) return validationError("email", "Email address is required.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return validationError("email", "Enter a valid email address.");
+    }
+    if (!password) return validationError("password", "Password is required.");
 
     const phoneValidation = validateAndNormalizePhone(rawPhone);
     if (!phoneValidation.valid) {
-      return NextResponse.json(
-        {
-          success: false,
-          code: "VALIDATION_ERROR",
-          message: phoneValidation.error || "Please enter a valid phone number.",
-          error: phoneValidation.error || "Please enter a valid phone number.",
-        },
-        { status: 400 }
+      return validationError(
+        "phoneNumber",
+        phoneValidation.error || "Please enter a valid phone number."
       );
     }
 
     if (password.length < 6) {
-      return NextResponse.json(
-        {
-          success: false,
-          code: "VALIDATION_ERROR",
-          message: "Password must be at least 6 characters long.",
-          error: "Password must be at least 6 characters long.",
-        },
-        { status: 400 }
-      );
+      return validationError("password", "Password must be at least 6 characters long.");
     }
 
-    const orgName = organizationName?.trim() || `${fullName}'s ISP`;
+    const orgName = organizationName || `${fullName}'s ISP`;
     const orgSlug = `${slugify(orgName)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const normalizedPhone = phoneValidation.normalizedPhoneNumber;
 
@@ -115,8 +114,14 @@ export async function POST(req: NextRequest) {
 
     if (orgError || !org) {
       console.error("[Register API] Organization creation failed:", orgError);
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => undefined);
       return NextResponse.json(
-        { success: false, error: "Failed to initialize organization data." },
+        {
+          success: false,
+          code: "SIGNUP_FAILED",
+          message: "Unable to create the account.",
+          error: "Unable to create the account.",
+        },
         { status: 500 }
       );
     }
@@ -135,8 +140,15 @@ export async function POST(req: NextRequest) {
 
     if (profileError) {
       console.error("[Register API] Profile creation failed:", profileError);
+      await supabaseAdmin.from("organizations").delete().eq("id", org.id);
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => undefined);
       return NextResponse.json(
-        { success: false, error: "Failed to create user profile." },
+        {
+          success: false,
+          code: "SIGNUP_FAILED",
+          message: "Unable to create the account.",
+          error: "Unable to create the account.",
+        },
         { status: 500 }
       );
     }
